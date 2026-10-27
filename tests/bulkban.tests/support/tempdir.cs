@@ -50,6 +50,11 @@ internal static class TempDir
         return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddYears(-3), DateTimeOffset.UtcNow.AddYears(-2));
     }
 
+    internal static string WriteEcdsaCer(string root, string relativePath)
+    {
+        return WriteCertBytes(root, relativePath, CreateSelfSignedEcdsa().Export(X509ContentType.Cert));
+    }
+
     internal static (string Root, string BaseDir, string CurrentDir) PathsWithCerts()
     {
         var root = Create();

@@ -61,7 +61,7 @@ internal static class CertClassifier
         var subject = cert.Subject;
         reason = DetectUnsupportedReason(cert);
 
-        return new CertInfo(file.FileName, subject, sha256, reason is null, reason);
+        return new CertInfo(file.FullPath, file.FileName, subject, sha256, reason is null, reason);
     }
 
     private static string? DetectUnsupportedReason(X509Certificate2 cert)
