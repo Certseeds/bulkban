@@ -51,6 +51,18 @@ internal static class TempDir
         return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddYears(-3), DateTimeOffset.UtcNow.AddYears(-2));
     }
 
+    internal static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "bulkban.slnx")))
+        {
+            dir = dir.Parent;
+        }
+
+        return dir?.FullName
+            ?? throw new InvalidOperationException("找不到仓库根目录");
+    }
+
     internal static string BuiltOutput()
     {
         var root = Create();

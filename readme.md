@@ -12,10 +12,79 @@
 
 本项目**只能在 Windows 上编译**;运行时也会校验系统版本,不满足时以 exit code 2 退出。当前只产出 **win-x64** 版本。
 
+Windows Home 不在支持范围:`build` 依赖 `ConfigCI` 的 `Add-SignerRule` / `ConvertFrom-CIPolicy`。
+
+## 用法
+
+```text
+bulkban build   [--certs-dir <dir>] [--output-dir <dir>]
+bulkban install [--output-dir <dir>] [--dry-run] [--yes] [--force]
+bulkban apply   [--certs-dir <dir>] [--output-dir <dir>] [--dry-run] [--yes] [--force]
+bulkban verify  [--output-dir <dir>]
+bulkban remove  [--output-dir <dir>] [--dry-run] [--yes]
+```
+
+- `build`:生成 `xmls/`、`cips/`、SHA-256 sidecar 和 `manifest.json`;不需要管理员。
+- `install`:校验产物 hash 后安装;需要管理员。
+- `apply`:`build` + `install`;`--dry-run` 只构建并打印计划。
+- `verify`:重新校验产物完整性。
+- `remove`:按 `state.json` 卸载。
+
+证书目录按以下顺序解析:`--certs-dir` → exe 同目录的 `certs` → 当前工作目录的 `certs`。
+
+## 分组规则
+
+- `certs/` 下每个直接子目录生成一个 policy。
+- 根目录下的 `.cer` 合并为一个 policy,组名 `others`。
+- 组内只读取直接包含的 `.cer`,不递归。
+- 若存在名为 `others` 的子目录,构建失败并提示重命名。
+
+## 产物布局
+
+```text
+<output-dir>/
+├─ xmls/<group>.xml
+├─ xmls/<group>.xml.sha256
+├─ cips/<group>.cip
+├─ cips/<group>.cip.sha256
+├─ manifest.json
+└─ state.json            # install/remove 维护
+```
+
+每个 policy 先 Allow All,再对组内证书添加 user-mode deny signer。
+PolicyID 由 UUIDv5 确定性派生,同一组重复构建不会新增策略。
+
+## 不支持自动封禁的证书
+
+以下证书会被跳过并在 `manifest.json` 的 `unsupported` 中记录原因:
+
+- ECDSA/ECC(WDAC signer 规则只支持 RSA)
+- RSA 密钥长度超过 4096
+- CA:TRUE
+- 缺少代码签名 EKU(`1.3.6.1.5.5.7.3.3`)
+
+## 安装后端
+
+- 系统存在 `CiTool.exe`(Windows 11 22H2+ / Server 2025+)时使用 CiTool。
+- 否则复制到 `C:\Windows\System32\CodeIntegrity\CiPolicies\Active\<PolicyID>.cip`,需要重启生效。
+
+## 退出码
+
+| code | 含义 |
+|---|---|
+| 0 | 成功 |
+| 1 | 通用错误 |
+| 2 | 不支持的 Windows 版本 |
+| 3 | 找不到证书目录或 manifest |
+| 4 | 需要管理员权限 |
+| 5 | 构建失败 |
+| 6 | hash 校验失败 |
+| 7 | 安装/卸载失败 |
+
 ## 开发环境
 
 - .NET SDK 10(`global.json` 锁定了 10.0.403)
-- 发布 NativeAOT 需要 Visual Studio 2022 Build Tools 的 **Desktop development with C++** 工作负载
+- 发布 NativeAOT 需要 Visual Studio 2022 Build Tools 的 MSVC 工具集与 Windows SDK
 
 ```powershell
 dotnet restore
@@ -26,5 +95,7 @@ dotnet run --project src/bulkban -- --help
 # NativeAOT 单文件发布,产物在 artifacts/publish/bulkban.exe
 ./scripts/publish.ps1
 ```
+
+`publish.ps1` 会在发布后检查产物目录,一旦出现 `certs` 目录或 `.cer` 文件就删除产物并失败。
 
 版本号取自 `package.json` 的 `version` 字段;`--version` 输出 `<version>+<git sha>`。
