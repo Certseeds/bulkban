@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using bulkban.Certs;
+using bulkban.Store;
 
 namespace bulkban.tests.Support;
 
@@ -58,6 +59,27 @@ internal static class TempDir
             new bulkban.Build.BuildOptions(Path.Combine(root, "certs"), root),
             new FakePowerShellHost());
         return root;
+    }
+
+    internal static Manifest LoadManifest(string outputDir)
+    {
+        return System.Text.Json.JsonSerializer.Deserialize(
+            File.ReadAllText(Path.Combine(outputDir, "manifest.json")),
+            JsonContext.Default.Manifest)!;
+    }
+
+    internal static Manifest ManifestWithTwoGroups()
+    {
+        return new Manifest(
+            1,
+            "0.0.1",
+            "2026-10-28T00:00:00Z",
+            "C:\\certs",
+            new[]
+            {
+                new ManifestGroup("a", "{11111111-2222-4333-8444-555555555551}", 1, Array.Empty<UnsupportedCert>(), "xmls/a.xml", "x", "cips/a.cip", "y"),
+                new ManifestGroup("others", "{11111111-2222-4333-8444-555555555552}", 1, Array.Empty<UnsupportedCert>(), "xmls/others.xml", "x", "cips/others.cip", "y"),
+            });
     }
 
     internal static string WriteEcdsaCer(string root, string relativePath)
