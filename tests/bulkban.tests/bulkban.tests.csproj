@@ -3,6 +3,9 @@
   <PropertyGroup>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <!-- 测试代码里的数组字面量、命名等不属于产品行为,分析器降级为警告。 -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,6 +21,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="bulkban.tests.Support" />
   </ItemGroup>
 
 </Project>
