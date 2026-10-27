@@ -35,23 +35,21 @@ internal static class Program
 
     internal static RootCommand BuildRootCommand()
     {
-        var dryRunOption = new Option<bool>("--dry-run")
-        {
-            Description = "只列出将被封禁的证书,不实际修改证书存储。"
-        };
-
         var rootCommand = new RootCommand("在 Windows 设备上批量封禁应用证书。");
-        rootCommand.Options.Add(dryRunOption);
 
-        rootCommand.SetAction(parseResult =>
-        {
-            var dryRun = parseResult.GetValue(dryRunOption);
-            Console.WriteLine(dryRun
-                ? "dry-run: 尚未实现证书枚举。"
-                : "尚未实现证书封禁逻辑。");
-            return 0;
-        });
+        rootCommand.Subcommands.Add(CreatePlaceholderCommand("build", "生成 WDAC policy 中间产物。"));
+        rootCommand.Subcommands.Add(CreatePlaceholderCommand("install", "安装已生成的 WDAC policy。"));
+        rootCommand.Subcommands.Add(CreatePlaceholderCommand("apply", "构建并安装 WDAC policy。"));
+        rootCommand.Subcommands.Add(CreatePlaceholderCommand("verify", "校验已生成产物的完整性。"));
+        rootCommand.Subcommands.Add(CreatePlaceholderCommand("remove", "卸载已安装的 WDAC policy。"));
 
         return rootCommand;
+    }
+
+    private static Command CreatePlaceholderCommand(string name, string description)
+    {
+        var command = new Command(name, description);
+        command.SetAction(_ => 0);
+        return command;
     }
 }

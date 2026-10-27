@@ -655,3 +655,4 @@ $RECYCLE.BIN/
 # bulkban build outputs
 /bin/
 /dist/
+/certs/

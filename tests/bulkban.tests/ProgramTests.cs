@@ -2,12 +2,17 @@ namespace bulkban.tests;
 
 public class ProgramTests
 {
-    [Fact]
-    public void ParseDryRunShouldSucceed()
+    [Theory]
+    [InlineData("build")]
+    [InlineData("install")]
+    [InlineData("apply")]
+    [InlineData("verify")]
+    [InlineData("remove")]
+    public void RootCommandHasSubcommand(string name)
     {
-        var parseResult = Program.BuildRootCommand().Parse("--dry-run");
+        var root = Program.BuildRootCommand();
 
-        Assert.Empty(parseResult.Errors);
+        Assert.Contains(root.Subcommands, c => c.Name == name);
     }
 
     [Fact]
