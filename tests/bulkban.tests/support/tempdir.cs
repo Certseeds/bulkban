@@ -50,8 +50,18 @@ internal static class TempDir
         return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddYears(-3), DateTimeOffset.UtcNow.AddYears(-2));
     }
 
-    internal static CertGroup GroupFromBytes(string name, params byte[][] certs)
+    internal static (string Root, string BaseDir, string CurrentDir) PathsWithCerts()
     {
+        var root = Create();
+        var baseDir = Path.Combine(root, "app");
+        var currentDir = Path.Combine(root, "work");
+        Directory.CreateDirectory(Path.Combine(baseDir, "certs"));
+        Directory.CreateDirectory(Path.Combine(currentDir, "certs"));
+        Directory.CreateDirectory(Path.Combine(root, "explicit"));
+        return (root, baseDir, currentDir);
+    }
+
+    internal static CertGroup GroupFromBytes(string name, params byte[][] certs)    {
         var root = Create();
         var dir = Path.Combine(root, "certs", name);
         Directory.CreateDirectory(dir);
