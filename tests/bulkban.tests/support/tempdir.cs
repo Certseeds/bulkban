@@ -50,6 +50,16 @@ internal static class TempDir
         return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddYears(-3), DateTimeOffset.UtcNow.AddYears(-2));
     }
 
+    internal static string BuiltOutput()
+    {
+        var root = Create();
+        WriteCer(root, "certs/a/1.cer");
+        bulkban.Build.PolicyBuilder.Build(
+            new bulkban.Build.BuildOptions(Path.Combine(root, "certs"), root),
+            new FakePowerShellHost());
+        return root;
+    }
+
     internal static string WriteEcdsaCer(string root, string relativePath)
     {
         return WriteCertBytes(root, relativePath, CreateSelfSignedEcdsa().Export(X509ContentType.Cert));
