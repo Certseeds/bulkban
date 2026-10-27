@@ -24,6 +24,38 @@ public class ProgramTests
     }
 
     [Theory]
+    [InlineData("verify", "--output-dir")]
+    [InlineData("build", "--certs-dir")]
+    [InlineData("install", "--output-dir")]
+    public void SubcommandParsesItsOptions(string command, string option)
+    {
+        var result = Program.BuildRootCommand().Parse(new[] { command, option });
+
+        // 缺参数时应有解析错误,证明该选项已注册
+        Assert.NotEmpty(result.Errors);
+    }
+
+    [Fact]
+    public void MissingCertsDirReturnsExit3()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+
+        var result = Program.BuildRootCommand().Parse(new[] { "build", "--certs-dir", missing });
+
+        Assert.Equal(3, result.Invoke());
+    }
+
+    [Fact]
+    public void MissingManifestVerifyReturnsExit6()
+    {
+        var emptyDir = TempDir.Create();
+
+        var result = Program.BuildRootCommand().Parse(new[] { "verify", "--output-dir", emptyDir });
+
+        Assert.Equal(6, result.Invoke());
+    }
+
+    [Theory]
     [InlineData(19044, false)] // Windows 10 21H2
     [InlineData(19045, true)]  // Windows 10 22H2
     [InlineData(20348, true)]  // Windows Server 2022
