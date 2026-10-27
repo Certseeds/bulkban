@@ -1,0 +1,9 @@
+<Project>
+
+  <!-- 编译期也要锁死在 Windows 上,不要依赖 EnableWindowsTargeting 跨平台构建。 -->
+  <Target Name="EnsureWindowsBuild" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(OS)' != 'Windows_NT'"
+           Text="bulkban targets net10.0-windows and can only be built on Windows." />
+  </Target>
+
+</Project>

@@ -16,3 +16,19 @@ trim_trailing_whitespace = true
 
 [makefile]
 indent_style = tab
+
+[*.cs]
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# C# style
+csharp_style_namespace_declarations = file_scoped:suggestion
+dotnet_sort_system_directives_first = true
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion

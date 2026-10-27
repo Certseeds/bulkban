@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/bulkban/bulkban.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/bulkban.tests/bulkban.tests.csproj" />
+  </Folder>
+</Solution>
