@@ -35,6 +35,16 @@ public class ProgramTests
         Assert.NotEmpty(result.Errors);
     }
 
+    [Theory]
+    [InlineData("build")]
+    [InlineData("apply")]
+    public void EnforceOptionIsRegistered(string command)
+    {
+        var cmd = Program.BuildRootCommand().Subcommands.Single(c => c.Name == command);
+
+        Assert.Contains(cmd.Options, o => o.Name == "--enforce");
+    }
+
     [Fact]
     public void MissingCertsDirReturnsExit3()
     {

@@ -16,9 +16,10 @@ internal static class PolicyXml
     };
 
     /// <summary>
-    /// 在 XML 转 CIP **之前**调用:写入 PolicyID、策略名,移除规则选项,并规范化 ID。
+    /// 在 XML 转 CIP **之前**调用:写入 PolicyID、策略名,设置 audit/enforce,
+    /// 移除规则选项,并规范化 ID。
     /// </summary>
-    internal static void Finalize(string xmlPath, Guid policyId, string policyName)
+    internal static void Finalize(string xmlPath, Guid policyId, string policyName, PolicyMode mode)
     {
         var doc = XDocument.Load(xmlPath);
         var root = doc.Root ?? throw new InvalidOperationException($"策略 XML 没有根节点:{xmlPath}");
@@ -28,11 +29,39 @@ internal static class PolicyXml
         SetElementValue(root, "BasePolicyID", formattedId);
 
         PruneRules(root);
+        ApplyAuditMode(root, mode);
         NormalizeFileRuleIds(root);
         NormalizeSigners(root);
         SetPolicyInfo(root, policyName, formattedId);
 
         doc.Save(xmlPath, SaveOptions.DisableFormatting);
+    }
+
+    private const string AuditModeOption = "Enabled:Audit Mode";
+
+    /// <summary>Audit 模式加规则选项;Enforce 模式移除它。</summary>
+    private static void ApplyAuditMode(XElement root, PolicyMode mode)
+    {
+        var rules = root.Element(Ns + "Rules");
+        if (rules is null)
+        {
+            return;
+        }
+
+        var existing = rules.Elements(Ns + "Rule")
+            .Where(rule => rule.Element(Ns + "Option")?.Value == AuditModeOption)
+            .ToList();
+
+        if (mode == PolicyMode.Enforce)
+        {
+            existing.Remove();
+            return;
+        }
+
+        if (existing.Count == 0)
+        {
+            rules.Add(new XElement(Ns + "Rule", new XElement(Ns + "Option", AuditModeOption)));
+        }
     }
 
     /// <summary>

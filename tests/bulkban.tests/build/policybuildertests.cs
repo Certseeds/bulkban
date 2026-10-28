@@ -114,6 +114,32 @@ public class PolicyBuilderTests
     }
 
     [Fact]
+    public void BuildDefaultsToAuditMode()
+    {
+        var root = TempDir.Create();
+        TempDir.WriteCer(root, "certs/a/1.cer");
+
+        var result = PolicyBuilder.Build(new BuildOptions(Path.Combine(root, "certs"), root), new FakePowerShellHost());
+
+        Assert.Equal("audit", result.Manifest.Mode);
+        Assert.Contains("Enabled:Audit Mode", File.ReadAllText(Path.Combine(root, "xmls", "a.xml")));
+    }
+
+    [Fact]
+    public void BuildEnforceModeOmitsAuditRule()
+    {
+        var root = TempDir.Create();
+        TempDir.WriteCer(root, "certs/a/1.cer");
+
+        var result = PolicyBuilder.Build(
+            new BuildOptions(Path.Combine(root, "certs"), root, bulkban.Wdac.PolicyMode.Enforce),
+            new FakePowerShellHost());
+
+        Assert.Equal("enforce", result.Manifest.Mode);
+        Assert.DoesNotContain("Enabled:Audit Mode", File.ReadAllText(Path.Combine(root, "xmls", "a.xml")));
+    }
+
+    [Fact]
     public void GroupWithOnlyUnsupportedCertsProducesNoPolicy()
     {
         var root = TempDir.Create();

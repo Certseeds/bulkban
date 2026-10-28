@@ -5,6 +5,7 @@ internal sealed record Manifest(
     string ToolVersion,
     string GeneratedAt,
     string CertsDir,
+    string Mode,
     IReadOnlyList<ManifestGroup> Groups);
 
 internal sealed record ManifestGroup(

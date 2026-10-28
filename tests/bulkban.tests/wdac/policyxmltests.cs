@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using bulkban.Wdac;
 
@@ -15,7 +16,7 @@ public class PolicyXmlTests
         AllowAllTemplate.WriteTo(path);
         var id = Guid.Parse("11111111-2222-4333-8444-555555555555");
 
-        PolicyXml.Finalize(path, id, "others");
+        PolicyXml.Finalize(path, id, "others", PolicyMode.Audit);
 
         var doc = XDocument.Load(path);
         Assert.Equal("{11111111-2222-4333-8444-555555555555}", doc.Root!.Element(Ns + "PolicyID")!.Value);
@@ -32,7 +33,7 @@ public class PolicyXmlTests
         var path = Path.Combine(TempDir.Create(), "p.xml");
         AllowAllTemplate.WriteTo(path);
 
-        PolicyXml.Finalize(path, Guid.NewGuid(), "360");
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Audit);
 
         var doc = XDocument.Load(path);
         var fileRules = doc.Root!.Element(Ns + "FileRules")!;
@@ -46,7 +47,7 @@ public class PolicyXmlTests
         var path = Path.Combine(TempDir.Create(), "p.xml");
         AllowAllTemplate.WriteTo(path);
 
-        PolicyXml.Finalize(path, Guid.NewGuid(), "tencent");
+        PolicyXml.Finalize(path, Guid.NewGuid(), "tencent", PolicyMode.Audit);
 
         var doc = XDocument.Load(path);
         var nameSetting = doc.Root!
@@ -63,7 +64,7 @@ public class PolicyXmlTests
         AllowAllTemplate.WriteTo(path);
         AddChainSigners(path, 3);
 
-        PolicyXml.Finalize(path, Guid.NewGuid(), "360");
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Audit);
 
         var doc = XDocument.Load(path);
         var signerIds = doc.Root!.Element(Ns + "Signers")!
@@ -88,7 +89,7 @@ public class PolicyXmlTests
         AllowAllTemplate.WriteTo(path);
         AddChainSigners(path, 2);
 
-        PolicyXml.Finalize(path, Guid.NewGuid(), "360");
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Audit);
 
         var doc = XDocument.Load(path);
         var signers = doc.Root!.Element(Ns + "Signers")!.Elements(Ns + "Signer").ToList();
@@ -109,7 +110,7 @@ public class PolicyXmlTests
             .SetAttributeValue("Value", "F6BF44F1ACAE05FC1638190459485DA95F4ED1EC");
         doc.Save(path, SaveOptions.DisableFormatting);
 
-        PolicyXml.Finalize(path, Guid.NewGuid(), "360");
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Audit);
 
         var signer = XDocument.Load(path).Root!.Element(Ns + "Signers")!.Element(Ns + "Signer")!;
         Assert.Equal("F6BF44F1", signer.Attribute("Name")!.Value);
@@ -125,12 +126,63 @@ public class PolicyXmlTests
             .Select(c => c.Attribute("Value")!.Value)
             .ToList();
 
-        PolicyXml.Finalize(path, Guid.NewGuid(), "360");
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Audit);
 
         var after = XDocument.Load(path).Descendants(Ns + "CertRoot")
             .Select(c => c.Attribute("Value")!.Value)
             .ToList();
         Assert.Equal(before, after);
+    }
+
+    [Fact]
+    public void FinalizeAuditModeAddsAuditRule()
+    {
+        var path = Path.Combine(TempDir.Create(), "p.xml");
+        AllowAllTemplate.WriteTo(path);
+
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Audit);
+
+        Assert.Contains("Enabled:Audit Mode", File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void FinalizeEnforceModeRemovesAuditRule()
+    {
+        var path = Path.Combine(TempDir.Create(), "p.xml");
+        AllowAllTemplate.WriteTo(path);
+        var doc = XDocument.Load(path);
+        doc.Root!.Element(Ns + "Rules")!.Add(
+            new XElement(Ns + "Rule", new XElement(Ns + "Option", "Enabled:Audit Mode")));
+        doc.Save(path, SaveOptions.DisableFormatting);
+
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Enforce);
+
+        Assert.DoesNotContain("Enabled:Audit Mode", File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void FinalizeEnforceModeKeepsSingleAuditRuleWhenAlreadyAbsent()
+    {
+        var path = Path.Combine(TempDir.Create(), "p.xml");
+        AllowAllTemplate.WriteTo(path);
+
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Enforce);
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Enforce);
+
+        Assert.DoesNotContain("Enabled:Audit Mode", File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void FinalizeAuditModeDoesNotDuplicateRule()
+    {
+        var path = Path.Combine(TempDir.Create(), "p.xml");
+        AllowAllTemplate.WriteTo(path);
+
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Audit);
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Audit);
+
+        var xml = File.ReadAllText(path);
+        Assert.Equal(1, Regex.Count(xml, "Enabled:Audit Mode"));
     }
 
     /// <summary>模拟 Add-SignerRule 的链式 ID:`X`、`X_0`、`X_0_0`…</summary>

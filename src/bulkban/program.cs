@@ -77,18 +77,27 @@ internal static class Program
         Description = "产物目录;默认使用证书目录的父目录。",
     };
 
+    private static Option<bool> EnforceOption() => new("--enforce")
+    {
+        Description = "生成 ban(强制阻止)策略;默认生成 audit(只记录、不阻止)策略。",
+    };
+
     private static Command CreateBuildCommand()
     {
         var certsDir = CertsDirOption();
         var outputDir = OutputDirOption();
-        var command = new Command("build", "生成 WDAC policy 中间产物。")
+        var enforce = EnforceOption();
+        var command = new Command("build", "生成 WDAC policy 中间产物(默认 audit 模式)。")
         {
             certsDir,
             outputDir,
+            enforce,
         };
 
-        command.SetAction(parseResult =>
-            RunBuild(parseResult.GetValue(certsDir), parseResult.GetValue(outputDir)));
+        command.SetAction(parseResult => RunBuild(
+            parseResult.GetValue(certsDir),
+            parseResult.GetValue(outputDir),
+            parseResult.GetValue(enforce)));
 
         return command;
     }
@@ -120,13 +129,15 @@ internal static class Program
     {
         var certsDir = CertsDirOption();
         var outputDir = OutputDirOption();
+        var enforce = EnforceOption();
         var dryRun = new Option<bool>("--dry-run") { Description = "只构建并打印安装计划。" };
         var yes = new Option<bool>("--yes") { Description = "跳过交互确认。" };
         var force = new Option<bool>("--force") { Description = "hash 不匹配时仍然安装。" };
-        var command = new Command("apply", "构建并安装 WDAC policy。")
+        var command = new Command("apply", "构建并安装 WDAC policy(默认 audit 模式)。")
         {
             certsDir,
             outputDir,
+            enforce,
             dryRun,
             yes,
             force,
@@ -138,7 +149,7 @@ internal static class Program
             var output = parseResult.GetValue(outputDir);
             var isDryRun = parseResult.GetValue(dryRun);
 
-            var buildExit = RunBuild(certs, output);
+            var buildExit = RunBuild(certs, output, parseResult.GetValue(enforce));
             if (buildExit != ExitSuccess)
             {
                 return buildExit;
@@ -175,7 +186,7 @@ internal static class Program
         return command;
     }
 
-    private static int RunBuild(string? certsOption, string? outputOption)
+    private static int RunBuild(string? certsOption, string? outputOption, bool enforce)
     {
         string certsDir;
         string outputDir;
@@ -198,13 +209,18 @@ internal static class Program
 
         try
         {
-            var result = PolicyBuilder.Build(new BuildOptions(certsDir, outputDir), new PowerShellHost());
+            var result = PolicyBuilder.Build(
+                new BuildOptions(
+                    certsDir,
+                    outputDir,
+                    enforce ? PolicyMode.Enforce : PolicyMode.Audit),
+                new PowerShellHost());
             foreach (var warning in result.Warnings)
             {
                 Console.WriteLine($"警告:{warning}");
             }
 
-            Console.WriteLine($"已生成 {result.Manifest.Groups.Count} 个 policy 到 {outputDir}");
+            Console.WriteLine($"已生成 {result.Manifest.Groups.Count} 个 policy 到 {outputDir}(模式:{result.Manifest.Mode})");
             foreach (var group in result.Manifest.Groups)
             {
                 Console.WriteLine($"  {group.Name}:{group.CertCount} 张证书,{group.PolicyId}");
@@ -395,6 +411,10 @@ internal static class Program
 
     private static void PrintInstallPlan(Store.Manifest manifest, string backendName)
     {
+        var mode = string.Equals(manifest.Mode, "audit", StringComparison.OrdinalIgnoreCase)
+            ? "audit(只记录,不阻止运行)"
+            : "enforce(阻止运行)";
+        Console.WriteLine($"模式:{mode}");
         Console.WriteLine($"后端:{backendName}");
         foreach (var group in manifest.Groups)
         {

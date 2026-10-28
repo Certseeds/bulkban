@@ -30,7 +30,7 @@ internal static class PolicyBuilder
 
             foreach (var group in classified)
             {
-                var entry = BuildGroup(group, staging, host, usedNames);
+                var entry = BuildGroup(group, staging, host, usedNames, options.Mode);
                 if (entry is null)
                 {
                     skippedGroups.Add(group.Name);
@@ -45,6 +45,7 @@ internal static class PolicyBuilder
                 ToolVersion: ToolVersion.Current,
                 GeneratedAt: DateTimeOffset.UtcNow.ToString("O"),
                 CertsDir: Path.GetFullPath(options.CertsDir),
+                Mode: options.Mode.ToManifestValue(),
                 Groups: manifestGroups);
 
             foreach (var skipped in skippedGroups)
@@ -72,7 +73,8 @@ internal static class PolicyBuilder
         ClassifiedGroup group,
         string staging,
         IPowerShellHost host,
-        HashSet<string> usedNames)
+        HashSet<string> usedNames,
+        PolicyMode mode)
     {
         // 组内没有任何可支持的证书时不生成策略:一个空的 AllowAll 策略会占用策略名额,
         // 还会误导用户以为该组已被封禁。
@@ -100,7 +102,7 @@ internal static class PolicyBuilder
         // Finalize 必须早于 ConvertToCip:PolicyID、规则选项和 ID 规范化都会写入 XML,
         // 而 ConvertFrom-CIPolicy 会把当时的 XML 固化进 CIP。
         var policyGuid = PolicyId.ForGroup(group.Name);
-        PolicyXml.Finalize(xmlPath, policyGuid, group.Name);
+        PolicyXml.Finalize(xmlPath, policyGuid, group.Name, mode);
 
         host.ConvertToCip(xmlPath, cipPath);
 

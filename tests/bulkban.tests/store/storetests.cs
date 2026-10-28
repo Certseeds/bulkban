@@ -8,7 +8,7 @@ public class StoreTests
     [Fact]
     public void ManifestRoundTripsThroughSourceGeneratedJson()
     {
-        var manifest = new Manifest(1, "0.0.1", "2026-10-27T00:00:00Z", "C:\\certs", new[]
+        var manifest = new Manifest(1, "0.0.1", "2026-10-27T00:00:00Z", "C:\\certs", "audit", new[]
         {
             new ManifestGroup(
                 "others",
@@ -28,6 +28,7 @@ public class StoreTests
         Assert.Equal(manifest.Groups[0].PolicyId, back.Groups[0].PolicyId);
         Assert.Equal(manifest.Groups[0].Unsupported[0], back.Groups[0].Unsupported[0]);
         Assert.Contains("\"policyId\"", json);
+        Assert.Contains("\"mode\": \"audit\"", json);
     }
 
     [Fact]

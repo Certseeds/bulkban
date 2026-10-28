@@ -17,13 +17,15 @@ Windows Home 不在支持范围:`build` 依赖 `ConfigCI` 的 `Add-SignerRule` /
 ## 用法
 
 ```text
-bulkban build   [--certs-dir <dir>] [--output-dir <dir>]
+bulkban build   [--certs-dir <dir>] [--output-dir <dir>] [--enforce]
 bulkban install [--output-dir <dir>] [--dry-run] [--yes] [--force]
-bulkban apply   [--certs-dir <dir>] [--output-dir <dir>] [--dry-run] [--yes] [--force]
+bulkban apply   [--certs-dir <dir>] [--output-dir <dir>] [--enforce] [--dry-run] [--yes] [--force]
 bulkban verify  [--output-dir <dir>]
 bulkban remove  [--output-dir <dir>] [--dry-run] [--yes]
 ```
 
+- **默认生成 audit 模式**:策略只记录会被阻止的程序,不实际阻止运行。
+- `--enforce`:生成 ban(强制阻止)模式;`install` 时会显示当前模式。
 - `build`:生成 `xmls/`、`cips/`、SHA-256 sidecar 和 `manifest.json`;不需要管理员。
 - `install`:校验产物 hash 后安装;需要管理员。
 - `apply`:`build` + `install`;`--dry-run` 只构建并打印计划。

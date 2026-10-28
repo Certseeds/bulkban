@@ -17,7 +17,7 @@ public class PolicyXmlSchemaTests
         var path = Path.Combine(TempDir.Create(), "p.xml");
         AllowAllTemplate.WriteTo(path);
 
-        PolicyXml.Finalize(path, Guid.Parse("6e013850-2e32-5f22-b069-209ec8df6139"), "2345");
+        PolicyXml.Finalize(path, Guid.Parse("6e013850-2e32-5f22-b069-209ec8df6139"), "2345", PolicyMode.Audit);
 
         var errors = ValidateAgainstSchema(path);
         Assert.Empty(errors);
@@ -31,7 +31,7 @@ public class PolicyXmlSchemaTests
         AddSigner(path, "ID_SIGNER_S_1_1");
         AddSigner(path, "ID_SIGNER_S_1_1_0");
 
-        PolicyXml.Finalize(path, Guid.Parse("d49ecc6b-5152-58d8-9128-bc288fcf986c"), "360");
+        PolicyXml.Finalize(path, Guid.Parse("d49ecc6b-5152-58d8-9128-bc288fcf986c"), "360", PolicyMode.Audit);
 
         var errors = ValidateAgainstSchema(path);
         Assert.Empty(errors);
@@ -45,7 +45,7 @@ public class PolicyXmlSchemaTests
         AddSigner(path, "ID_SIGNER_S_1_1");
         ChainAllowIds(path, 3);
 
-        PolicyXml.Finalize(path, Guid.NewGuid(), "360");
+        PolicyXml.Finalize(path, Guid.NewGuid(), "360", PolicyMode.Audit);
 
         var ids = XDocument.Load(path).Root!
             .Element(Ns + "FileRules")!
@@ -65,7 +65,7 @@ public class PolicyXmlSchemaTests
         AllowAllTemplate.WriteTo(path);
         AddSigner(path, "ID_SIGNER_S_1_1_0_0_0_0_0_0_0_0_0_0_0_0_0_0_0_0_0_0");
 
-        PolicyXml.Finalize(path, Guid.NewGuid(), "others");
+        PolicyXml.Finalize(path, Guid.NewGuid(), "others", PolicyMode.Audit);
 
         var xml = File.ReadAllText(path);
         Assert.DoesNotContain("0_0_0_0", xml, StringComparison.Ordinal);

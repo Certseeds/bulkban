@@ -87,6 +87,7 @@ internal static class TempDir
             "0.0.1",
             "2026-10-28T00:00:00Z",
             "C:\\certs",
+            "audit",
             new[]
             {
                 new ManifestGroup("a", "{11111111-2222-4333-8444-555555555551}", 1, Array.Empty<UnsupportedCert>(), "xmls/a.xml", "x", "cips/a.cip", "y"),
