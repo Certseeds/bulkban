@@ -32,10 +32,10 @@ public class PolicyBuilderTests
         var result = PolicyBuilder.Build(new BuildOptions(Path.Combine(root, "certs"), root), new FakePowerShellHost());
 
         Assert.Equal(SubdirAAndOthers, result.Manifest.Groups.Select(g => g.Name));
-        Assert.True(File.Exists(Path.Combine(root, "xmls", "a.xml")));
-        Assert.True(File.Exists(Path.Combine(root, "cips", "a.cip")));
-        Assert.True(File.Exists(Path.Combine(root, "xmls", "a.xml.sha256")));
-        Assert.True(File.Exists(Path.Combine(root, "cips", "a.cip.sha256")));
+        Assert.True(File.Exists(Path.Combine(root, "audit-xmls", "a.xml")));
+        Assert.True(File.Exists(Path.Combine(root, "audit-cips", "a.cip")));
+        Assert.True(File.Exists(Path.Combine(root, "audit-xmls", "a.xml.sha256")));
+        Assert.True(File.Exists(Path.Combine(root, "audit-cips", "a.cip.sha256")));
         Assert.True(File.Exists(Path.Combine(root, "manifest.json")));
     }
 
@@ -67,7 +67,7 @@ public class PolicyBuilderTests
 
         var result = PolicyBuilder.Build(new BuildOptions(Path.Combine(root, "certs"), root), host);
         var group = Assert.Single(result.Manifest.Groups);
-        var cip = File.ReadAllBytes(Path.Combine(root, "cips", "a.cip"));
+        var cip = File.ReadAllBytes(Path.Combine(root, "audit-cips", "a.cip"));
 
         var realId = Guid.Parse(group.PolicyId);
         var templateId = Guid.Parse("31351756-3F24-4963-8380-4E7602335AAE");
@@ -84,7 +84,7 @@ public class PolicyBuilderTests
 
         PolicyBuilder.Build(new BuildOptions(Path.Combine(root, "certs"), root), new FakePowerShellHost());
 
-        var xml = File.ReadAllText(Path.Combine(root, "xmls", "a.xml"));
+        var xml = File.ReadAllText(Path.Combine(root, "audit-xmls", "a.xml"));
         Assert.DoesNotContain("Inherit Default Policy", xml, StringComparison.Ordinal);
         Assert.DoesNotContain("Revoked Expired As Unsigned", xml, StringComparison.Ordinal);
     }
@@ -122,7 +122,7 @@ public class PolicyBuilderTests
         var result = PolicyBuilder.Build(new BuildOptions(Path.Combine(root, "certs"), root), new FakePowerShellHost());
 
         Assert.Equal("audit", result.Manifest.Mode);
-        Assert.Contains("Enabled:Audit Mode", File.ReadAllText(Path.Combine(root, "xmls", "a.xml")));
+        Assert.Contains("Enabled:Audit Mode", File.ReadAllText(Path.Combine(root, "audit-xmls", "a.xml")));
     }
 
     [Fact]
@@ -136,7 +136,25 @@ public class PolicyBuilderTests
             new FakePowerShellHost());
 
         Assert.Equal("enforce", result.Manifest.Mode);
-        Assert.DoesNotContain("Enabled:Audit Mode", File.ReadAllText(Path.Combine(root, "xmls", "a.xml")));
+        Assert.DoesNotContain("Enabled:Audit Mode", File.ReadAllText(Path.Combine(root, "enforce-xmls", "a.xml")));
+    }
+
+    [Fact]
+    public void BuildEnforceKeepsAuditCip()
+    {
+        var root = TempDir.Create();
+        TempDir.WriteCer(root, "certs/a/1.cer");
+        var options = new BuildOptions(Path.Combine(root, "certs"), root);
+        PolicyBuilder.Build(options, new FakePowerShellHost());
+        var auditCip = File.ReadAllBytes(Path.Combine(root, "audit-cips", "a.cip"));
+
+        var result = PolicyBuilder.Build(
+            options with { Mode = bulkban.Wdac.PolicyMode.Enforce },
+            new FakePowerShellHost());
+
+        Assert.Equal("enforce", result.Manifest.Mode);
+        Assert.True(File.Exists(Path.Combine(root, "enforce-cips", "a.cip")));
+        Assert.Equal(auditCip, File.ReadAllBytes(Path.Combine(root, "audit-cips", "a.cip")));
     }
 
     [Fact]
@@ -150,7 +168,7 @@ public class PolicyBuilderTests
 
         Assert.Single(result.Manifest.Groups);
         Assert.Equal("rsa", result.Manifest.Groups[0].Name);
-        Assert.DoesNotContain(Directory.GetFiles(Path.Combine(root, "cips")), f => f.Contains("ecc", StringComparison.Ordinal));
+        Assert.DoesNotContain(Directory.GetFiles(Path.Combine(root, "audit-cips")), f => f.Contains("ecc", StringComparison.Ordinal));
         Assert.Contains(result.Warnings, w => w.Contains("ecc-only", StringComparison.Ordinal));
     }
 
@@ -177,8 +195,8 @@ public class PolicyBuilderTests
         var result = PolicyBuilder.Build(options, new FakePowerShellHost());
 
         Assert.Equal(SubdirAAndB, result.Manifest.Groups.Select(g => g.Name));
-        Assert.Equal(2, Directory.GetFiles(Path.Combine(root, "xmls")).Count(f => f.EndsWith(".xml", StringComparison.Ordinal)));
-        Assert.Equal(2, Directory.GetFiles(Path.Combine(root, "cips")).Count(f => f.EndsWith(".cip", StringComparison.Ordinal)));
+        Assert.Equal(2, Directory.GetFiles(Path.Combine(root, "audit-xmls")).Count(f => f.EndsWith(".xml", StringComparison.Ordinal)));
+        Assert.Equal(2, Directory.GetFiles(Path.Combine(root, "audit-cips")).Count(f => f.EndsWith(".cip", StringComparison.Ordinal)));
         Assert.Empty(Directory.GetDirectories(root, ".backup-*"));
     }
 
@@ -189,14 +207,14 @@ public class PolicyBuilderTests
         TempDir.WriteCer(root, "certs/a/1.cer");
         PolicyBuilder.Build(new BuildOptions(Path.Combine(root, "certs"), root), new FakePowerShellHost());
 
-        // 模拟上次提交中断:xmls/ 被移进备份后进程死亡。
+        // 模拟上次提交中断:audit-xmls/ 被移进备份后进程死亡。
         var backup = Path.Combine(root, ".backup-deadbeef");
         Directory.CreateDirectory(backup);
-        Directory.Move(Path.Combine(root, "xmls"), Path.Combine(backup, "xmls"));
+        Directory.Move(Path.Combine(root, "audit-xmls"), Path.Combine(backup, "audit-xmls"));
 
         PolicyBuilder.Build(new BuildOptions(Path.Combine(root, "certs"), root), new FakePowerShellHost());
 
-        Assert.True(File.Exists(Path.Combine(root, "xmls", "a.xml")));
+        Assert.True(File.Exists(Path.Combine(root, "audit-xmls", "a.xml")));
         Assert.Empty(Directory.GetDirectories(root, ".backup-*"));
     }
 

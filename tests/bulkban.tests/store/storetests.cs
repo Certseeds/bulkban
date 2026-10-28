@@ -15,9 +15,9 @@ public class StoreTests
                 "{845A53CA-2F58-53EF-B5FD-F0A75FE0965E}",
                 160,
                 new[] { new UnsupportedCert("tuling times 256.2022.04.cer", "Tuling Times", "ECC signer rules are not supported by WDAC") },
-                "xmls/others.xml",
+                "audit-xmls/others.xml",
                 "aa",
-                "cips/others.cip",
+                "audit-cips/others.cip",
                 "bb"),
         });
 

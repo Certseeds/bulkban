@@ -7,13 +7,12 @@ namespace bulkban.Build;
 
 internal static class PolicyBuilder
 {
-    private static readonly string[] CommittedDirectories = { "xmls", "cips" };
-
     internal static BuildResult Build(BuildOptions options, IPowerShellHost host)
     {
         // 先完成所有读取/解析,任何失败都在写入前抛出,避免污染已有产物。
         var groups = CertScanner.Scan(options.CertsDir);
         var classified = groups.Select(CertClassifier.Classify).ToList();
+        var modeName = options.Mode.ToManifestValue();
         var warnings = classified
             .SelectMany(g => g.Unsupported.Select(u => $"[{g.Name}] 跳过 {u.FileName}:{u.UnsupportedReason}"))
             .ToList();
@@ -45,7 +44,7 @@ internal static class PolicyBuilder
                 ToolVersion: ToolVersion.Current,
                 GeneratedAt: DateTimeOffset.UtcNow.ToString("O"),
                 CertsDir: Path.GetFullPath(options.CertsDir),
-                Mode: options.Mode.ToManifestValue(),
+                Mode: modeName,
                 Groups: manifestGroups);
 
             foreach (var skipped in skippedGroups)
@@ -57,7 +56,7 @@ internal static class PolicyBuilder
                 Path.Combine(staging, "manifest.json"),
                 JsonSerializer.Serialize(manifest, JsonContext.Default.Manifest));
 
-            Commit(staging, options.OutputDir);
+            Commit(staging, options.OutputDir, options.Mode);
             return new BuildResult(manifest, warnings);
         }
         finally
@@ -83,8 +82,8 @@ internal static class PolicyBuilder
             return null;
         }
 
-        var xmlDir = Path.Combine(staging, "xmls");
-        var cipDir = Path.Combine(staging, "cips");
+        var xmlDir = Path.Combine(staging, mode.XmlDirectory());
+        var cipDir = Path.Combine(staging, mode.CipDirectory());
         Directory.CreateDirectory(xmlDir);
         Directory.CreateDirectory(cipDir);
 
@@ -116,81 +115,60 @@ internal static class PolicyBuilder
             Unsupported: group.Unsupported
                 .Select(u => new UnsupportedCert(u.FileName, u.Subject, u.UnsupportedReason ?? string.Empty))
                 .ToList(),
-            Xml: "xmls/" + fileStem + ".xml",
+            Xml: mode.XmlDirectory() + "/" + fileStem + ".xml",
             XmlSha256: Hashing.Sha256File(xmlPath),
-            Cip: "cips/" + fileStem + ".cip",
+            Cip: mode.CipDirectory() + "/" + fileStem + ".cip",
             CipSha256: Hashing.Sha256File(cipPath));
     }
 
     /// <summary>
-    /// 以“整体替换”的方式提交:先把旧的 xmls/、cips/、manifest.json 重命名到备份目录,
-    /// 再移入新的;任何一步失败都回滚。重命名在同卷上是原子操作,进程中断后
-    /// 残留的 .backup- 目录可在下次构建前恢复。
+    /// 以“整体替换”的方式提交:只替换 xmls/、当前模式的 cips/&lt;mode&gt;/ 和 manifest.json;
+    /// 另一种模式的 CIP 目录保持不变。任何一步失败都回滚。
     /// </summary>
-    private static void Commit(string staging, string outputDir)
+    private static void Commit(string staging, string outputDir, PolicyMode mode)
     {
         RecoverIfInterrupted(outputDir);
 
         var backup = Path.Combine(outputDir, ".backup-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(backup);
+        var paths = CommittedPaths(mode);
 
-        var movedToBackup = new List<string>();
         try
         {
-            foreach (var name in CommittedDirectories.Append("manifest.json"))
+            foreach (var relative in paths)
             {
-                var existing = Path.Combine(outputDir, name);
+                var existing = Path.Combine(outputDir, relative);
+                var saved = Path.Combine(backup, relative);
                 if (Directory.Exists(existing))
                 {
-                    Directory.Move(existing, Path.Combine(backup, name));
-                    movedToBackup.Add(name);
+                    Directory.CreateDirectory(Path.GetDirectoryName(saved)!);
+                    Directory.Move(existing, saved);
                 }
                 else if (File.Exists(existing))
                 {
-                    File.Move(existing, Path.Combine(backup, name));
-                    movedToBackup.Add(name);
+                    Directory.CreateDirectory(Path.GetDirectoryName(saved)!);
+                    File.Move(existing, saved);
                 }
             }
 
-            foreach (var name in CommittedDirectories)
-            {
-                var source = Path.Combine(staging, name);
-                Directory.Move(source, Path.Combine(outputDir, name));
-            }
-
+            Directory.Move(
+                Path.Combine(staging, mode.XmlDirectory()),
+                Path.Combine(outputDir, mode.XmlDirectory()));
+            Directory.Move(
+                Path.Combine(staging, mode.CipDirectory()),
+                Path.Combine(outputDir, mode.CipDirectory()));
             File.Move(
                 Path.Combine(staging, "manifest.json"),
                 Path.Combine(outputDir, "manifest.json"));
         }
         catch
         {
-            // 回滚:删掉已移入的新文件,再把备份移回。
-            foreach (var name in CommittedDirectories.Append("manifest.json"))
+            foreach (var relative in paths)
             {
-                var current = Path.Combine(outputDir, name);
-                if (Directory.Exists(current))
-                {
-                    Directory.Delete(current, recursive: true);
-                }
-                else if (File.Exists(current))
-                {
-                    File.Delete(current);
-                }
+                DeletePath(Path.Combine(outputDir, relative));
             }
 
-            foreach (var name in movedToBackup)
-            {
-                var saved = Path.Combine(backup, name);
-                if (Directory.Exists(saved))
-                {
-                    Directory.Move(saved, Path.Combine(outputDir, name));
-                }
-                else if (File.Exists(saved))
-                {
-                    File.Move(saved, Path.Combine(outputDir, name));
-                }
-            }
-
+            RestoreBackup(backup, outputDir);
             throw;
         }
         finally
@@ -202,34 +180,54 @@ internal static class PolicyBuilder
         }
     }
 
-    /// <summary>上次构建在提交中途中断:把残留的 .backup- 内容恢复回去。</summary>
+    private static string[] CommittedPaths(PolicyMode mode) =>
+        new[] { mode.XmlDirectory(), mode.CipDirectory(), "manifest.json" };
+
+    private static void DeletePath(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Directory.Delete(path, recursive: true);
+        }
+        else if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>上次构建在提交中途中断:把残留 .backup- 的内容按顶层路径恢复。</summary>
     private static void RecoverIfInterrupted(string outputDir)
     {
         foreach (var backup in Directory.GetDirectories(outputDir, ".backup-*"))
         {
-            foreach (var entry in Directory.GetFileSystemEntries(backup))
-            {
-                var target = Path.Combine(outputDir, Path.GetFileName(entry));
-                if (Directory.Exists(target))
-                {
-                    Directory.Delete(target, recursive: true);
-                }
-                else if (File.Exists(target))
-                {
-                    File.Delete(target);
-                }
-
-                if (Directory.Exists(entry))
-                {
-                    Directory.Move(entry, target);
-                }
-                else
-                {
-                    File.Move(entry, target);
-                }
-            }
-
+            RestoreBackup(backup, outputDir);
             Directory.Delete(backup, recursive: true);
+        }
+    }
+
+    /// <summary>备份目录里只有当前模式的 xmls/cips 目录和 manifest.json,按顶层路径恢复。</summary>
+    private static void RestoreBackup(string backup, string outputDir)
+    {
+        Directory.CreateDirectory(outputDir);
+
+        foreach (var entry in Directory.GetFileSystemEntries(backup))
+        {
+            var targetPath = Path.Combine(outputDir, Path.GetFileName(entry));
+            DeletePath(targetPath);
+            MoveEntry(entry, targetPath);
+        }
+    }
+
+    private static void MoveEntry(string source, string target)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        if (Directory.Exists(source))
+        {
+            Directory.Move(source, target);
+        }
+        else
+        {
+            File.Move(source, target, overwrite: true);
         }
     }
 }

@@ -63,14 +63,21 @@ internal static class TempDir
             ?? throw new InvalidOperationException("找不到仓库根目录");
     }
 
-    internal static string BuiltOutput()
+    internal static string BuiltOutput(bulkban.Wdac.PolicyMode mode = bulkban.Wdac.PolicyMode.Audit)
     {
         var root = Create();
         WriteCer(root, "certs/a/1.cer");
         bulkban.Build.PolicyBuilder.Build(
-            new bulkban.Build.BuildOptions(Path.Combine(root, "certs"), root),
+            new bulkban.Build.BuildOptions(Path.Combine(root, "certs"), root, mode),
             new FakePowerShellHost());
         return root;
+    }
+
+    internal static void RewriteManifest(string root, Manifest manifest)
+    {
+        File.WriteAllText(
+            Path.Combine(root, "manifest.json"),
+            System.Text.Json.JsonSerializer.Serialize(manifest, JsonContext.Default.Manifest));
     }
 
     internal static Manifest LoadManifest(string outputDir)
@@ -90,8 +97,8 @@ internal static class TempDir
             "audit",
             new[]
             {
-                new ManifestGroup("a", "{11111111-2222-4333-8444-555555555551}", 1, Array.Empty<UnsupportedCert>(), "xmls/a.xml", "x", "cips/a.cip", "y"),
-                new ManifestGroup("others", "{11111111-2222-4333-8444-555555555552}", 1, Array.Empty<UnsupportedCert>(), "xmls/others.xml", "x", "cips/others.cip", "y"),
+                new ManifestGroup("a", "{11111111-2222-4333-8444-555555555551}", 1, Array.Empty<UnsupportedCert>(), "audit-xmls/a.xml", "x", "audit-cips/a.cip", "y"),
+                new ManifestGroup("others", "{11111111-2222-4333-8444-555555555552}", 1, Array.Empty<UnsupportedCert>(), "audit-xmls/others.xml", "x", "audit-cips/others.cip", "y"),
             });
     }
 

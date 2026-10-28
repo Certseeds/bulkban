@@ -656,6 +656,10 @@ $RECYCLE.BIN/
 /bin/
 /dist/
 /certs/
+/audit-xmls/
+/audit-cips/
+/enforce-xmls/
+/enforce-cips/
 /xmls/
 /cips/
 /manifest.json

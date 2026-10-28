@@ -26,11 +26,13 @@ bulkban remove  [--output-dir <dir>] [--dry-run] [--yes]
 
 - **默认生成 audit 模式**:策略只记录会被阻止的程序,不实际阻止运行。
 - `--enforce`:生成 ban(强制阻止)模式;`install` 时会显示当前模式。
-- `build`:生成 `xmls/`、`cips/`、SHA-256 sidecar 和 `manifest.json`;不需要管理员。
-- `install`:校验产物 hash 后安装;需要管理员。
+- `build`:按模式生成 `audit-xmls/`+`audit-cips/` 或 `enforce-xmls/`+`enforce-cips/`,以及 SHA-256 sidecar 和 `manifest.json`;不需要管理员。
+- `install`:校验清单、模式目录、CIP 头和 hash 后安装;需要管理员。
 - `apply`:`build` + `install`;`--dry-run` 只构建并打印计划。
-- `verify`:重新校验产物完整性。
+- `verify`:重新校验产物完整性和模式一致性。
 - `remove`:按 `state.json` 卸载。
+
+两种模式的产物目录互相独立,先 build audit 再 build enforce 不会覆盖 audit 产物;`manifest.json` 指向最近一次构建的模式。
 
 证书目录按以下顺序解析:`--certs-dir` → exe 同目录的 `certs` → 当前工作目录的 `certs`。
 
@@ -45,13 +47,20 @@ bulkban remove  [--output-dir <dir>] [--dry-run] [--yes]
 
 ```text
 <output-dir>/
-├─ xmls/<group>.xml
-├─ xmls/<group>.xml.sha256
-├─ cips/<group>.cip
-├─ cips/<group>.cip.sha256
+├─ audit-xmls/<group>.xml
+├─ audit-xmls/<group>.xml.sha256
+├─ audit-cips/<group>.cip
+├─ audit-cips/<group>.cip.sha256
+├─ enforce-xmls/<group>.xml
+├─ enforce-xmls/<group>.xml.sha256
+├─ enforce-cips/<group>.cip
+├─ enforce-cips/<group>.cip.sha256
 ├─ manifest.json
 └─ state.json            # install/remove 维护
 ```
+
+`manifest.json` 的 `mode` 决定读取哪一组目录;CIP 头里的 Audit 位必须与清单模式一致,
+否则 `verify` / `install` 以 exit 6 拒绝。
 
 每个 policy 先 Allow All,再对组内证书添加 user-mode deny signer。
 PolicyID 由 UUIDv5 确定性派生,同一组重复构建不会新增策略。

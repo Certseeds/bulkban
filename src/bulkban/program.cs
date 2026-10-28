@@ -270,15 +270,29 @@ internal static class Program
             return ExitHashMismatch;
         }
 
-        var errors = Verifier.Verify(outputDir);
-        if (errors.Count > 0 && !force)
+        var structuralErrors = Verifier.VerifyStructure(manifest, outputDir);
+        if (structuralErrors.Count > 0)
         {
-            foreach (var error in errors)
+            foreach (var error in structuralErrors)
             {
                 Console.Error.WriteLine(error);
             }
 
             return ExitHashMismatch;
+        }
+
+        if (!force)
+        {
+            var hashErrors = Verifier.VerifyHashes(manifest, outputDir);
+            if (hashErrors.Count > 0)
+            {
+                foreach (var error in hashErrors)
+                {
+                    Console.Error.WriteLine(error);
+                }
+
+                return ExitHashMismatch;
+            }
         }
 
         var backend = BackendSelector.Select(Environment.GetFolderPath(Environment.SpecialFolder.Windows));

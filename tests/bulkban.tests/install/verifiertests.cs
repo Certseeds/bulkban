@@ -1,6 +1,8 @@
 using bulkban.Build;
 using bulkban.Install;
+using bulkban.Store;
 using bulkban.tests.Support;
+using bulkban.Wdac;
 
 namespace bulkban.tests.Install;
 
@@ -11,7 +13,7 @@ public class VerifierTests
     {
         var root = TempDir.BuiltOutput();
 
-        File.AppendAllText(Path.Combine(root, "cips", "a.cip"), "x");
+        File.AppendAllText(Path.Combine(root, "audit-cips", "a.cip"), "x");
 
         var errors = Verifier.Verify(root);
 
@@ -28,10 +30,42 @@ public class VerifierTests
     }
 
     [Fact]
+    public void CipInWrongModeDirectoryIsReported()
+    {
+        var root = TempDir.BuiltOutput(PolicyMode.Enforce);
+        var manifest = TempDir.LoadManifest(root);
+        TempDir.RewriteManifest(root, manifest with { Mode = "audit" });
+
+        var errors = Verifier.Verify(root);
+
+        Assert.Contains(errors, e => e.Contains("audit-cips/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CipContentModeMismatchIsReported()
+    {
+        var root = TempDir.BuiltOutput(PolicyMode.Audit);
+        Directory.CreateDirectory(Path.Combine(root, "enforce-cips"));
+        File.Copy(
+            Path.Combine(root, "audit-cips", "a.cip"),
+            Path.Combine(root, "enforce-cips", "a.cip"));
+
+        var manifest = TempDir.LoadManifest(root);
+        var group = manifest.Groups[0] with { Cip = "enforce-cips/a.cip" };
+        TempDir.RewriteManifest(
+            root,
+            manifest with { Mode = "enforce", Groups = new[] { group } });
+
+        var errors = Verifier.Verify(root);
+
+        Assert.Contains(errors, e => e.Contains("模式不匹配", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void MissingArtifactIsReported()
     {
         var root = TempDir.BuiltOutput();
-        File.Delete(Path.Combine(root, "xmls", "a.xml"));
+        File.Delete(Path.Combine(root, "audit-xmls", "a.xml"));
 
         var errors = Verifier.Verify(root);
 
