@@ -21,6 +21,16 @@ jobs:
       - name: Restore
         run: dotnet restore
 
+      - name: Check WDAC tooling
+        shell: powershell
+        run: |
+          "Windows: $([Environment]::OSVersion.VersionString)"
+          "PowerShell: $($PSVersionTable.PSVersion)"
+          $cmd = Get-Command ConvertFrom-CIPolicy -ErrorAction SilentlyContinue
+          "ConfigCI: $([bool]$cmd) $(if ($cmd) { $cmd.ModuleName })"
+          "Add-SignerRule: $([bool](Get-Command Add-SignerRule -ErrorAction SilentlyContinue))"
+          "CiTool: $(Test-Path "$env:SystemRoot\System32\CiTool.exe")"
+
       - name: Build
         run: dotnet build --no-restore -c Release
 
