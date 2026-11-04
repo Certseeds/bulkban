@@ -25,13 +25,16 @@ Remove-Item -LiteralPath (Join-Path $projectDir 'bin') -Recurse -Force -ErrorAct
 Remove-Item -LiteralPath (Join-Path $projectDir 'obj') -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $publishDir -Recurse -Force -ErrorAction SilentlyContinue
 
+# 依赖由 packages.lock.json 锁定;锁文件与项目不一致时 locked mode 会直接失败,
+# 需要显式更新锁文件后再发布。
 dotnet publish (Join-Path $projectDir 'bulkban.csproj') `
     -c $Configuration `
     -r $RuntimeIdentifier `
     -o $publishDir `
     -p:NativeDebugSymbols=false `
     -p:DebugType=None `
-    -p:DebugSymbols=false
+    -p:DebugSymbols=false `
+    -p:RestoreLockedMode=true
 
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
