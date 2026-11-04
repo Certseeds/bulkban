@@ -1,5 +1,4 @@
-using System.Diagnostics;
-using System.Text;
+using bulkban.Processes;
 
 namespace bulkban.Wdac;
 
@@ -45,29 +44,15 @@ internal sealed class PowerShellHost : IPowerShellHost
 
     private static (int ExitCode, string StandardOutput, string StandardError) RunScript(string script)
     {
-        var startInfo = new ProcessStartInfo(PowerShellPath)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
-        };
-        startInfo.ArgumentList.Add("-NoProfile");
-        startInfo.ArgumentList.Add("-NonInteractive");
-        startInfo.ArgumentList.Add("-ExecutionPolicy");
-        startInfo.ArgumentList.Add("Bypass");
-        startInfo.ArgumentList.Add("-Command");
-        startInfo.ArgumentList.Add(script);
+        var result = CommandRunner.Run(
+            PowerShellPath,
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            script);
 
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("无法启动 powershell.exe");
-
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        return (process.ExitCode, stdout, stderr);
+        return (result.ExitCode, result.StandardOutput, result.StandardError);
     }
 }

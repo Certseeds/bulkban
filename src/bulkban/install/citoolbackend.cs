@@ -1,5 +1,4 @@
-using System.Diagnostics;
-using System.Globalization;
+using bulkban.Processes;
 
 namespace bulkban.Install;
 
@@ -23,9 +22,12 @@ internal sealed class CiToolBackend : IBackend
         try
         {
             File.Copy(cipPath, staged, overwrite: true);
-            return Run($"--update-policy \"{staged}\"", out var error) is { } ok && ok
-                ? true
-                : ThrowWithMessage(error);
+            if (Run(out var error, "--update-policy", staged, "--json"))
+            {
+                return true;
+            }
+
+            throw new InvalidOperationException($"CiTool 安装失败:{error.Trim()}");
         }
         finally
         {
@@ -38,45 +40,31 @@ internal sealed class CiToolBackend : IBackend
 
     public bool Remove(Guid policyId)
     {
-        return Run($"--remove-policy \"{FormatGuid(policyId)}\"", out _);
+        return Run(out _, "--remove-policy", FormatGuid(policyId), "--json");
     }
 
     public void Refresh()
     {
-        Run("--refresh", out _);
+        Run(out _, "--refresh", "--json");
     }
 
     internal static string FormatGuid(Guid id) =>
         "{" + id.ToString().ToUpperInvariant() + "}";
 
-    private bool Run(string arguments, out string error)
+    private bool Run(out string error, params string[] arguments)
     {
-        var startInfo = new ProcessStartInfo(_ciToolPath)
+        CommandOutput result;
+        try
         {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            Arguments = arguments + " --json",
-        };
-
-        using var process = Process.Start(startInfo);
-        if (process is null)
+            result = CommandRunner.Run(_ciToolPath, arguments);
+        }
+        catch (InvalidOperationException ex)
         {
-            error = "无法启动 CiTool.exe";
+            error = ex.Message;
             return false;
         }
 
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        error = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
-        return process.ExitCode == 0;
-    }
-
-    private static bool ThrowWithMessage(string error)
-    {
-        throw new InvalidOperationException($"CiTool 安装失败:{error.Trim()}");
+        error = string.IsNullOrWhiteSpace(result.StandardError) ? result.StandardOutput : result.StandardError;
+        return result.ExitCode == 0;
     }
 }
