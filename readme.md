@@ -39,9 +39,9 @@ bulkban remove  [--output-dir <dir>] [--dry-run] [--yes]
 ## 分组规则
 
 - `certs/` 下每个直接子目录生成一个 policy。
-- 根目录下的 `.cer` 合并为一个 policy,组名 `others`。
+- 根目录下的 `.cer` 与 `certs/others/` 里的 `.cer` 合并为一个 policy,组名 `others`。
 - 组内只读取直接包含的 `.cer`,不递归。
-- 若存在名为 `others` 的子目录,构建失败并提示重命名。
+- `certs/others/` 只允许放 `.cer`(按扩展名判断);出现其他文件或子目录时构建失败。
 
 ## 产物布局
 
