@@ -94,7 +94,7 @@ PolicyID 由 UUIDv5 确定性派生,同一组重复构建不会新增策略。
 
 ## 开发环境
 
-- .NET SDK 10(`global.json` 锁定了 10.0.403)
+- .NET SDK 10(`global.json` 锁定了 10.0.404)
 - 发布 NativeAOT 需要 Visual Studio 2022 Build Tools 的 MSVC 工具集与 Windows SDK
 
 ```powershell
