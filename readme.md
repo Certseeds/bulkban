@@ -42,6 +42,10 @@ bulkban remove  [--output-dir <dir>] [--dry-run] [--yes]
 - 根目录下的 `.cer` 与 `certs/others/` 里的 `.cer` 合并为一个 policy,组名 `others`。
 - 组内只读取直接包含的 `.cer`,不递归。
 - `certs/others/` 只允许放 `.cer`(按扩展名判断);出现其他文件或子目录时构建失败。
+- 单个目录最多 **150** 个 `.cer`;超过时 `build` 直接失败并提示拆分。`others` 组按根目录与 `certs/others/` 合计计数。
+  - 原因:单个 policy 的 signer 规则过多会让 ConfigCI 的 `ConvertFrom-CIPolicy` 抛 `System.OutOfMemoryException`。
+  - 拆分后的每个子目录会生成独立 policy;上面列出的受支持 Windows 版本不受 32 个活动策略上限限制。
+  - 示例:保留 `certs/others/`(不超过 150 个),把其余证书放进 `certs/others-2/`、`certs/others-3/`。
 
 ## 产物布局
 

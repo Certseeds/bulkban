@@ -46,4 +46,41 @@ public class PowerShellHostTests
         Assert.True(File.Exists(cip));
         Assert.Contains("DeniedSigners", File.ReadAllText(xml));
     }
+
+    [Fact]
+    public void WrappedScriptForcesUtf8Output()
+    {
+        var script = PowerShellHost.WrapScript("Write-Output 1");
+
+        Assert.Contains("[Console]::OutputEncoding", script, StringComparison.Ordinal);
+        Assert.Contains("UTF8", script, StringComparison.Ordinal);
+        Assert.Contains("Write-Output 1", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FailureMessageIncludesContext()
+    {
+        var message = PowerShellHost.FormatFailure(
+            "ConvertFrom-CIPolicy",
+            1,
+            @"C:\tmp\others.xml",
+            "boom");
+
+        Assert.Contains("ConvertFrom-CIPolicy", message, StringComparison.Ordinal);
+        Assert.Contains(@"C:\tmp\others.xml", message, StringComparison.Ordinal);
+        Assert.Contains("boom", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConversionFailureNamesTheXmlFile()
+    {
+        var dir = TempDir.Create();
+        var xml = Path.Combine(dir, "missing.xml");
+        var cip = Path.Combine(dir, "missing.cip");
+        var host = new PowerShellHost();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => host.ConvertToCip(xml, cip));
+
+        Assert.Contains(xml, ex.Message, StringComparison.Ordinal);
+    }
 }

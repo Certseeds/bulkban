@@ -5,6 +5,13 @@ internal static class CertScanner
     internal const string OthersGroupName = "others";
 
     /// <summary>
+    /// 单个 policy 的 signer 规则过多时,ConfigCI 的 ConvertFrom-CIPolicy 会抛
+    /// System.OutOfMemoryException(实测 200 条可成功、more than 300 条失败)
+    /// 这里按目录中的 .cer 数量提前设限,并要求用户拆分为多个子目录。
+    /// </summary>
+    internal const int MaxCerFilesPerGroup = 150;
+
+    /// <summary>
     /// 每个直接子目录一组,根目录下的 .cer 与 others 子目录里的 .cer 合并为 others;
     /// 组内不递归。
     /// </summary>
@@ -31,6 +38,7 @@ internal static class CertScanner
             var files = CollectCerFiles(dir);
             if (files.Count > 0)
             {
+                EnsureWithinLimit(name, files);
                 groups.Add(new CertGroup(name, files));
             }
         }
@@ -46,6 +54,7 @@ internal static class CertScanner
 
         if (othersFiles.Count > 0)
         {
+            EnsureWithinLimit(OthersGroupName, othersFiles);
             groups.Add(new CertGroup(OthersGroupName, othersFiles));
         }
 
@@ -86,6 +95,19 @@ internal static class CertScanner
             .Select(path => new CertFile(path, Path.GetFileName(path)))
             .OrderBy(f => f.FileName, StringComparer.Ordinal)
             .ToList();
+    }
+
+    private static void EnsureWithinLimit(string groupName, List<CertFile> files)
+    {
+        if (files.Count <= MaxCerFilesPerGroup)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"证书组 '{groupName}' 包含 {files.Count} 个 .cer,超过单目录上限 {MaxCerFilesPerGroup}。" +
+            $"请把证书拆分到 certs/ 下的多个子目录(每个子目录会生成独立 policy),例如 '{groupName}-2/';" +
+            "单个 policy 过大时 ConfigCI 的 ConvertFrom-CIPolicy 会内存溢出。");
     }
 
     private static bool IsCerFile(string path)

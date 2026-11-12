@@ -100,4 +100,51 @@ public class CertScannerTests
 
         Assert.Equal(OnlySubdirA, groups.Select(g => g.Name));
     }
+
+    [Fact]
+    public void GroupAtCerFileLimitIsAccepted()
+    {
+        var root = TempDir.Create();
+        WriteEmptyCers(root, "certs/a", 150);
+
+        var groups = CertScanner.Scan(Path.Combine(root, "certs"));
+
+        Assert.Equal(150, Assert.Single(groups).Files.Count);
+    }
+
+    [Fact]
+    public void GroupOverCerFileLimitIsRejected()
+    {
+        var root = TempDir.Create();
+        WriteEmptyCers(root, "certs/a", 151);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => CertScanner.Scan(Path.Combine(root, "certs")));
+
+        Assert.Contains("a", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("151", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("150", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("拆分", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MergedOthersGroupCountsRootAndOthersDirectoryTogether()
+    {
+        var root = TempDir.Create();
+        WriteEmptyCers(root, "certs", 1);
+        WriteEmptyCers(root, "certs/others", 150);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => CertScanner.Scan(Path.Combine(root, "certs")));
+
+        Assert.Contains("others", ex.Message, StringComparison.Ordinal);
+    }
+
+    private static void WriteEmptyCers(string root, string relativeDir, int count)
+    {
+        var dir = Path.Combine(root, relativeDir);
+        Directory.CreateDirectory(dir);
+        for (var i = 0; i < count; i++)
+        {
+            File.WriteAllText(Path.Combine(dir, i + ".cer"), string.Empty);
+        }
+    }
 }

@@ -89,6 +89,26 @@ public class PolicyBuilderTests
         Assert.DoesNotContain("Revoked Expired As Unsigned", xml, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void OverLimitGroupFailsBeforePowerShellStarts()
+    {
+        var root = TempDir.Create();
+        var certDir = Path.Combine(root, "certs", "a");
+        Directory.CreateDirectory(certDir);
+        for (var i = 0; i < 151; i++)
+        {
+            File.WriteAllText(Path.Combine(certDir, i + ".cer"), string.Empty);
+        }
+
+        var host = new FakePowerShellHost();
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            PolicyBuilder.Build(new BuildOptions(Path.Combine(root, "certs"), root), host));
+
+        Assert.Contains("150", ex.Message, StringComparison.Ordinal);
+        Assert.Empty(host.AddedCertificates);
+        Assert.False(Directory.Exists(Path.Combine(root, "audit-xmls")));
+    }
+
     private static int CountOccurrences(byte[] haystack, byte[] needle)
     {
         var count = 0;
