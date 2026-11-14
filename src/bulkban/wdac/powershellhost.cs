@@ -5,7 +5,7 @@ namespace bulkban.Wdac;
 internal sealed class PowerShellHost : IPowerShellHost
 {
     private const string Utf8OutputPrelude =
-        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8; ";
+        "try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }; ";
 
     private static readonly string PowerShellPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.System),
@@ -35,7 +35,8 @@ internal sealed class PowerShellHost : IPowerShellHost
 
     /// <summary>
     /// 子进程由 CliWrap 按 UTF-8 解码;Windows PowerShell 5.1 默认按控制台代码页
-    /// 输出中文,不强制 UTF-8 时错误信息会变成问号。
+    /// 输出中文。[Console]::OutputEncoding 是关键设置;ConstrainedLanguage 下该
+    /// 属性可能被禁止,用 try/catch 吞掉,避免中断后续命令。
     /// </summary>
     internal static string WrapScript(string script) => Utf8OutputPrelude + script;
 
@@ -57,7 +58,7 @@ internal sealed class PowerShellHost : IPowerShellHost
         }
     }
 
-    private static (int ExitCode, string StandardOutput, string StandardError) RunScript(string script)
+    internal static (int ExitCode, string StandardOutput, string StandardError) RunScript(string script)
     {
         var result = CommandRunner.Run(
             PowerShellPath,

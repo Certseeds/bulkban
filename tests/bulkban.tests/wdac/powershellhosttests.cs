@@ -83,4 +83,13 @@ public class PowerShellHostTests
 
         Assert.Contains(xml, ex.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void RunScriptEmitsUtf8ForChineseErrors()
+    {
+        var result = PowerShellHost.RunScript("Write-Error '中文错误'; exit 1");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("中文错误", result.StandardError, StringComparison.Ordinal);
+    }
 }

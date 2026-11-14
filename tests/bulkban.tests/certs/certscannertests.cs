@@ -124,6 +124,7 @@ public class CertScannerTests
         Assert.Contains("151", ex.Message, StringComparison.Ordinal);
         Assert.Contains("150", ex.Message, StringComparison.Ordinal);
         Assert.Contains("拆分", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(Path.Combine(root, "certs"), ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -135,7 +136,9 @@ public class CertScannerTests
 
         var ex = Assert.Throws<InvalidOperationException>(() => CertScanner.Scan(Path.Combine(root, "certs")));
 
-        Assert.Contains("others", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("'others'", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("151", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("根目录", ex.Message, StringComparison.Ordinal);
     }
 
     private static void WriteEmptyCers(string root, string relativeDir, int count)
