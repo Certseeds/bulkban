@@ -1,4 +1,6 @@
 using System.CommandLine;
+using System.Globalization;
+using Microsoft.Win32;
 using bulkban.Build;
 using bulkban.Install;
 using bulkban.Paths;
@@ -19,15 +21,29 @@ internal static class Program
 
     private const int MinimumWindows10Build = 19045; // Windows 10 22H2
     private const int MinimumWindows11Build = 22621; // Windows 11 22H2
+    private const int MinimumServer2022Build = 20348;
+    private const int MinimumWindows10Ubr = 4291; // KB5036892,2024-04-09
+    private const int MinimumWindows11Ubr = 3447; // KB5036893,2024-04-09
+    private const int MinimumServer2022Ubr = 2402; // KB5036909,2024-04-09
+    private const int PatchIncludedBuild = 26100; // Windows 11 24H2 / Server 2025 起自带修复
 
     private static int Main(string[] args)
     {
-        // TFM 已声明 net10.0-windows...,编译期即 Windows-only;这里只校验 WDAC 所需的最低 build。
+        // TFM 已声明 net10.0-windows...,编译期即 Windows-only;这里校验 WDAC 所需的最低 build 与 2024-04-09 补丁级别。
         var build = Environment.OSVersion.Version.Build;
         if (!IsSupportedWindowsBuild(build))
         {
             Console.Error.WriteLine(
-                $"bulkban 需要 Windows 10 22H2 ({MinimumWindows10Build}+)、Windows 11 22H2 ({MinimumWindows11Build}+) 或 Windows Server 2022 (20348+);当前 build {build}。");
+                $"bulkban 需要 Windows 10 22H2 ({MinimumWindows10Build}+)、Windows 11 22H2 ({MinimumWindows11Build}+) 或 Windows Server 2022 ({MinimumServer2022Build}+);当前 build {build}。");
+            return ExitUnsupportedWindows;
+        }
+
+        var ubr = ReadUbr();
+        if (!IsSupportedWindowsVersion(build, ubr))
+        {
+            var ubrText = ubr >= 0 ? ubr.ToString(CultureInfo.InvariantCulture) : "未知";
+            Console.Error.WriteLine(
+                $"bulkban 需要安装 2024-04-09 或之后的安全更新;当前 build {build}、UBR {ubrText},要求 UBR {MinimumUbrForBuild(build)} 或更高。");
             return ExitUnsupportedWindows;
         }
 
@@ -42,6 +58,22 @@ internal static class Program
         }
     }
 
+    internal static int ReadUbr()
+    {
+        try
+        {
+            var value = Registry.GetValue(
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+                "UBR",
+                null);
+            return value is int ubr ? ubr : -1;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            return -1;
+        }
+    }
+
     internal static bool IsSupportedWindowsBuild(int build)
     {
         // Windows 11 21H2 仍限制 32 个活动策略,必须排除。
@@ -52,6 +84,34 @@ internal static class Program
 
         // Windows 10 22H2 为 19045,Windows Server 2022 为 20348。
         return build >= MinimumWindows10Build;
+    }
+
+    internal static bool IsSupportedWindowsVersion(int build, int ubr) =>
+        IsSupportedWindowsBuild(build) && HasRequiredPatch(build, ubr);
+
+    internal static bool HasRequiredPatch(int build, int ubr)
+    {
+        if (build >= PatchIncludedBuild)
+        {
+            return true;
+        }
+
+        return ubr >= MinimumUbrForBuild(build);
+    }
+
+    internal static int MinimumUbrForBuild(int build)
+    {
+        if (build >= MinimumWindows11Build)
+        {
+            return MinimumWindows11Ubr;
+        }
+
+        if (build >= MinimumServer2022Build)
+        {
+            return MinimumServer2022Ubr;
+        }
+
+        return MinimumWindows10Ubr;
     }
 
     internal static RootCommand BuildRootCommand()

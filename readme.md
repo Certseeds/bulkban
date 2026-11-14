@@ -4,13 +4,15 @@
 
 ## 支持的系统
 
-仅支持以下 Windows 版本(WDAC 规则/策略数量不受 32 个上限限制):
+仅支持以下 Windows 版本(安装 2024-04-09 或之后的安全更新后,WDAC 规则/策略数量不受 32 个上限限制):
 
 - Windows 10 22H2(build 19045+)
 - Windows 11 22H2(build 22621+);Windows 11 21H2(build 22000)仍限制 32 个活动策略,不支持
 - Windows Server 2022(build 20348+)
 
-本项目**只能在 Windows 上编译**;运行时也会校验系统版本,不满足时以 exit code 2 退出。当前只产出 **win-x64** 版本。
+> 32 个活动策略上限需要安装 2024-04-09 或之后的安全更新才会解除;未安装时超过上限(系统自带的 inbox 策略也计入)可能导致 `ci.dll` 蓝屏,错误码 `0x0000003b`。
+
+本项目**只能在 Windows 上编译**;运行时也会校验系统版本和补丁级别(注册表 UBR),不满足时以 exit code 2 退出。当前只产出 **win-x64** 版本。
 
 Windows Home 不在支持范围:`build` 依赖 `ConfigCI` 的 `Add-SignerRule` / `ConvertFrom-CIPolicy`。
 
@@ -42,10 +44,11 @@ bulkban remove  [--output-dir <dir>] [--dry-run] [--yes]
 - 根目录下的 `.cer` 与 `certs/others/` 里的 `.cer` 合并为一个 policy,组名 `others`。
 - 组内只读取直接包含的 `.cer`,不递归。
 - `certs/others/` 只允许放 `.cer`(按扩展名判断);出现其他文件或子目录时构建失败。
-- 单个目录最多 **150** 个 `.cer`;超过时 `build` 直接失败并提示拆分。`others` 组按根目录与 `certs/others/` 合计计数。
+- 单个证书组最多 **150** 个 `.cer`(普通组即一个直接子目录;`others` 按根目录与 `certs/others/` 合计)。超过时 `build` 直接失败并提示拆分。
   - 原因:单个 policy 的 signer 规则过多会让 ConfigCI 的 `ConvertFrom-CIPolicy` 抛 `System.OutOfMemoryException`。
-  - 拆分后的每个子目录会生成独立 policy;上面列出的受支持 Windows 版本不受 32 个活动策略上限限制。
-  - 示例:保留 `certs/others/`(不超过 150 个),把其余证书放进 `certs/others-2/`、`certs/others-3/`。
+  - 拆分后的每个子目录会生成独立 policy; 活动策略数量限制取决于系统补丁状态,详见上文支持系统说明。
+  - 示例:保留 `certs/others/`(不超过 150 个),把其余证书放进 `certs/others-2/`、`certs/others-3/`;
+    - 根目录下的 `.cer` 也会并入 `others` 组,需要一并移入新子目录。
 
 ## 产物布局
 
@@ -89,7 +92,7 @@ PolicyID 由 UUIDv5 确定性派生,同一组重复构建不会新增策略。
 |---|---|
 | 0 | 成功 |
 | 1 | 通用错误 |
-| 2 | 不支持的 Windows 版本 |
+| 2 | 不支持的 Windows 版本(含未安装 2024-04-09 或之后安全更新的系统) |
 | 3 | 找不到证书目录或 manifest |
 | 4 | 需要管理员权限 |
 | 5 | 构建失败 |

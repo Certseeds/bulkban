@@ -78,4 +78,46 @@ public class ProgramTests
     {
         Assert.Equal(expected, Program.IsSupportedWindowsBuild(build));
     }
+
+    [Theory]
+    [InlineData(19044, 9999, false)] // build 本身不支持
+    [InlineData(19045, 4290, false)]
+    [InlineData(19045, 4291, true)]
+    [InlineData(19045, -1, false)] // UBR 未知:需要补丁的分支必须拒绝
+    [InlineData(20347, 4290, false)]
+    [InlineData(20347, 4291, true)]
+    [InlineData(20348, 2401, false)]
+    [InlineData(20348, 2402, true)]
+    [InlineData(20348, -1, false)]
+    [InlineData(21999, 2401, false)]
+    [InlineData(21999, 2402, true)]
+    [InlineData(22000, 9999, false)] // Windows 11 21H2
+    [InlineData(22620, 9999, false)]
+    [InlineData(22621, 3446, false)]
+    [InlineData(22621, 3447, true)]
+    [InlineData(22621, -1, false)]
+    [InlineData(22631, 3446, false)]
+    [InlineData(22631, 3447, true)]
+    [InlineData(26100, -1, true)] // 24H2 自带修复,不依赖 UBR
+    [InlineData(26200, 0, true)]
+    public void SupportedVersionMatrixIsCorrect(int build, int ubr, bool expected)
+    {
+        Assert.Equal(expected, Program.IsSupportedWindowsVersion(build, ubr));
+    }
+
+    [Theory]
+    [InlineData(19045, 4291)]
+    [InlineData(20348, 2402)]
+    [InlineData(22621, 3447)]
+    [InlineData(22631, 3447)]
+    public void MinimumUbrForBuildIsCorrect(int build, int expected)
+    {
+        Assert.Equal(expected, Program.MinimumUbrForBuild(build));
+    }
+
+    [Fact]
+    public void ReadUbrReturnsPositiveValue()
+    {
+        Assert.True(Program.ReadUbr() > 0);
+    }
 }
