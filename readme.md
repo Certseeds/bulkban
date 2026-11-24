@@ -113,6 +113,7 @@ PolicyID 由 UUIDv5 确定性派生,同一组重复构建不会新增策略。
 | `src/bulkban.web` | `net10.0`(Blazor WASM) | 浏览器端:拖入 zip → 输出 zip,全程本地处理 |
 
 浏览器端与 Windows 端共用 `bulkban.core` 的分组、证书解析与 XML 生成;
+
 唯一的差异是 XML → CIP:Windows 交给 `ConfigCI`,浏览器交给 `Microsoft.Security.CodeIntegrity`。
 
 ### 网页版
@@ -146,5 +147,7 @@ dotnet run --project src/bulkban -- --help
 ```
 
 `publish.ps1` 会在发布后检查产物目录,一旦出现 `certs` 目录或 `.cer` 文件就删除产物并失败。
+
+`certs/` 不进版本库。依赖它的测试(真实证书对拍、SHA-1/SHA-384 用例)在本机有该目录时才会执行, CI 上没有样本会自动跳过;因此 CI 绿不代表这些用例跑过。
 
 版本号取自 `package.json` 的 `version` 字段;`--version` 输出 `<version>+<git sha>`。

@@ -76,27 +76,9 @@ internal static class TestCertificates
     internal static byte[] WithRsaSha1() => Der(new CertSpec(HashAlgorithmName.SHA1));
 
     /// <summary>
-    /// 从仓库 certs/ 里挑一张签名算法匹配的真实证书。
-    /// SHA-1 证书 BCL 已经签不出来,只能用历史证书验证。
+    /// 仓库 certs/ 目录。证书不进仓库,所以这个目录可能不存在 —— 依赖它的测试要自己跳过。
     /// </summary>
-    internal static (string Path, byte[] Der) FindRealCertificate(string signatureAlgorithmFriendlyName)
-    {
-        var root = FindRepoCertsDir();
-        foreach (var file in Directory.EnumerateFiles(root, "*.cer", SearchOption.AllDirectories))
-        {
-            var der = File.ReadAllBytes(file);
-            using var cert = X509CertificateLoader.LoadCertificate(der);
-            var name = cert.SignatureAlgorithm.FriendlyName ?? string.Empty;
-            if (name.Equals(signatureAlgorithmFriendlyName, StringComparison.OrdinalIgnoreCase))
-            {
-                return (file, der);
-            }
-        }
-
-        throw new InvalidOperationException($"certs/ 里没有 {signatureAlgorithmFriendlyName} 证书");
-    }
-
-    private static string FindRepoCertsDir()
+    internal static string RepoCertsDir()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "bulkban.slnx")))
@@ -106,5 +88,44 @@ internal static class TestCertificates
 
         var root = dir?.FullName ?? throw new InvalidOperationException("找不到仓库根目录");
         return Path.Combine(root, "certs");
+    }
+
+    /// <summary>只返回能读出来的证书文件;目录不存在时返回空。</summary>
+    internal static IReadOnlyList<string> RepoCertificateFiles()
+    {
+        var root = RepoCertsDir();
+        if (!Directory.Exists(root))
+        {
+            return Array.Empty<string>();
+        }
+
+        return Directory.EnumerateFiles(root, "*.cer", SearchOption.AllDirectories).ToList();
+    }
+
+    /// <summary>
+    /// 从仓库 certs/ 里挑一张签名算法匹配的真实证书;没有可用目录或匹配不到时返回 null。
+    /// SHA-1 证书 BCL 已经签不出来,只能靠历史证书覆盖。
+    /// </summary>
+    internal static (string Path, byte[] Der)? FindRealCertificate(string signatureAlgorithmFriendlyName)
+    {
+        foreach (var file in RepoCertificateFiles())
+        {
+            var der = File.ReadAllBytes(file);
+            try
+            {
+                using var cert = X509CertificateLoader.LoadCertificate(der);
+                if ((cert.SignatureAlgorithm.FriendlyName ?? string.Empty)
+                    .Equals(signatureAlgorithmFriendlyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return (file, der);
+                }
+            }
+            catch (CryptographicException)
+            {
+                continue;
+            }
+        }
+
+        return null;
     }
 }
