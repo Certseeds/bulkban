@@ -1,0 +1,57 @@
+name: github pages
+
+on:
+  push:
+    branches: [ "master" ]
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: certseeds/common-actions/actions/checkout@v1
+
+      - uses: certseeds/common-actions/actions/setup-dotnet@v1
+        with:
+          dotnet-version: 10.0.404
+
+      - name: dotnet restore
+        run: dotnet restore --locked-mode
+
+      # core 的锁文件里有 win-x64 段(scripts/publish.ps1 需要),
+      # 而 --locked-mode 的解决方案级还原不评估 RID,所以这里单独按 RID 还原一次。
+      - name: dotnet restore win-x64
+        run: dotnet restore src/bulkban.core/bulkban.core.csproj -r win-x64 --locked-mode
+
+      # 用 --no-restore:无 RID 的隐式还原会把锁文件里的 win-x64 段删掉,
+      # 那会让同一份锁文件在 exe 发布时校验失败。
+      # index.html 里的 base href 是 "./",产物不依赖部署在哪个子路径下。
+      - name: dotnet publish web
+        run: dotnet publish src/bulkban.web/bulkban.web.csproj -c Release -o artifacts/web --no-restore
+
+      - name: Upload artifact
+        uses: certseeds/common-actions/actions/upload-pages-artifact@v1
+        with:
+          path: artifacts/web/wwwroot
+
+  # Deployment job
+  deploy:
+    needs: build
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: windows-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: certseeds/common-actions/actions/deploy-pages@v1
