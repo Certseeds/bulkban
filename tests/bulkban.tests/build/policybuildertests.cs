@@ -152,7 +152,7 @@ public class PolicyBuilderTests
         TempDir.WriteCer(root, "certs/a/1.cer");
 
         var result = PolicyBuilder.Build(
-            new BuildOptions(Path.Combine(root, "certs"), root, bulkban.Wdac.PolicyMode.Enforce),
+            new BuildOptions(Path.Combine(root, "certs"), root, PolicyMode.Enforce),
             new FakePowerShellHost());
 
         Assert.Equal("enforce", result.Manifest.Mode);
@@ -169,7 +169,7 @@ public class PolicyBuilderTests
         var auditCip = File.ReadAllBytes(Path.Combine(root, "audit-cips", "a.cip"));
 
         var result = PolicyBuilder.Build(
-            options with { Mode = bulkban.Wdac.PolicyMode.Enforce },
+            options with { Mode = PolicyMode.Enforce },
             new FakePowerShellHost());
 
         Assert.Equal("enforce", result.Manifest.Mode);

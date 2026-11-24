@@ -4,6 +4,7 @@ using Microsoft.Win32;
 using bulkban.Build;
 using bulkban.Install;
 using bulkban.Paths;
+using bulkban.Core.Policies;
 using bulkban.Wdac;
 
 namespace bulkban;

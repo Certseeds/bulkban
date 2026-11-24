@@ -113,8 +113,12 @@
         "type": "Project",
         "dependencies": {
           "CliWrap": "[3.10.5, )",
-          "System.CommandLine": "[2.0.14, )"
+          "System.CommandLine": "[2.0.14, )",
+          "bulkban.core": "[0.0.1, )"
         }
+      },
+      "bulkban.core": {
+        "type": "Project"
       }
     }
   }

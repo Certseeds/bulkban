@@ -1,5 +1,6 @@
 using System.Text.Json;
 using bulkban.Store;
+using bulkban.Core.Policies;
 using bulkban.Wdac;
 
 namespace bulkban.Install;

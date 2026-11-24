@@ -1,0 +1,112 @@
+@page "/"
+@using System.IO
+@using bulkban.Web.Conversion
+@inject IJSRuntime JS
+@inject ILogger<Home> Logger
+
+<PageTitle>bulkban · 证书转 WDAC 策略</PageTitle>
+
+<h1>bulkban</h1>
+<p class="sub">把含 <code>certs/</code> 目录的 zip 转成 WDAC 策略包。全部在浏览器本地完成,文件不会上传。</p>
+
+<div id="dropzone" class="drop @(_busy ? "busy" : "")" @onclick="PickFile">
+    @if (_busy)
+    {
+        <p>正在处理…</p>
+    }
+    else
+    {
+        <p><strong>拖入 zip 文件</strong>,或点击选择</p>
+        <p class="sub">zip 内需有 <code>certs/</code> 目录;根目录下的 .cer 归入 <code>others</code>。</p>
+    }
+</div>
+
+<InputFile id="certfile" OnChange="OnFileSelected" accept=".zip" style="display:none" @ref="_fileInput" />
+
+@if (_error is not null)
+{
+    <pre class="err">@_error</pre>
+}
+
+@if (_lines.Count > 0)
+{
+    <h2>结果</h2>
+    <pre>@string.Join("\n", _lines)</pre>
+    <button @onclick="Download">下载 @_downloadName</button>
+}
+
+@if (_warnings.Count > 0)
+{
+    <h2>警告(@_warnings.Count)</h2>
+    <pre class="warn">@string.Join("\n", _warnings.Take(50))@(_warnings.Count > 50 ? $"\n… 另有 {_warnings.Count - 50} 条" : "")</pre>
+}
+
+@code {
+    private InputFile? _fileInput;
+    private bool _busy;
+    private string? _error;
+    private List<string> _lines = new();
+    private List<string> _warnings = new();
+    private byte[]? _result;
+    private string _downloadName = "wdac-policies.zip";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await JS.InvokeVoidAsync("bulkbanDrop.attach", "certfile", "dropzone");
+    }
+
+    private async Task PickFile() => await JS.InvokeVoidAsync("bulkbanClick", "certfile");
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        _lines = new();
+        _warnings = new();
+        _result = null;
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 128L * 1024 * 1024);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            buffer.Position = 0;
+
+            var result = ConversionService.Convert(buffer);
+            _result = result.Zip;
+            _lines = result.Lines.ToList();
+            _warnings = result.Warnings.ToList();
+            _downloadName = Path.GetFileNameWithoutExtension(file.Name) + "-wdac.zip";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "conversion failed");
+            _error = ex.GetType().Name + ": " + ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task Download()
+    {
+        if (_result is null)
+        {
+            return;
+        }
+
+        await JS.InvokeVoidAsync("bulkbanDownload", _downloadName, Convert.ToBase64String(_result));
+    }
+}

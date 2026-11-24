@@ -104,6 +104,37 @@ PolicyID 由 UUIDv5 确定性派生,同一组重复构建不会新增策略。
 - .NET SDK 10(`global.json` 锁定了 10.0.404)
 - 发布 NativeAOT 需要 Visual Studio 2022 Build Tools 的 MSVC 工具集与 Windows SDK
 
+### 项目结构
+
+| 项目 | TFM | 用途 |
+|---|---|---|
+| `src/bulkban.core` | `net10.0` | 跨平台核心:证书解析、TBS 哈希、policy XML 生成 |
+| `src/bulkban` | `net10.0-windows10.0.19041.0` | Windows CLI:构建、安装、校验 |
+| `src/bulkban.web` | `net10.0`(Blazor WASM) | 浏览器端:拖入 zip → 输出 zip,全程本地处理 |
+
+浏览器端与 Windows 端共用 `bulkban.core` 的分组、证书解析与 XML 生成;
+唯一的差异是 XML → CIP:Windows 交给 `ConfigCI`,浏览器交给 `Microsoft.Security.CodeIntegrity`。
+
+### 网页版
+
+```powershell
+./scripts/publish-web.ps1     # 静态站点输出到 artifacts/web
+```
+
+拖入一个内含 `certs/` 目录的 zip,产出 zip 同时包含:
+
+```text
+audit-cips/  audit-xmls/  enforce-cips/  enforce-xmls/
+```
+
+每个 `.cip` / `.xml` 旁边带 `.sha256`。文件不上传,全部在浏览器里处理。
+
+`bulkban.core` 刻意**不使用** `System.Security.Cryptography.X509Certificates`:
+
+该 API 在 browser 平台不可用,且拿不到 TBSCertificate 的原始编码。
+证书解析走自带的 DER 解析器(`asn1/derreader.cs`),TBS 哈希算法跟随证书自身的
+signatureAlgorithm(与 ConfigCI 一致):SHA-256 证书用 SHA-256,SHA-1 证书用 SHA-1。
+
 ```powershell
 dotnet restore
 dotnet build

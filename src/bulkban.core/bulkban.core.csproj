@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>bulkban.core</AssemblyName>
+    <RootNamespace>bulkban.Core</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="bulkban.core.tests" />
+    <InternalsVisibleTo Include="bulkban" />
+    <InternalsVisibleTo Include="bulkban.web" />
+    <InternalsVisibleTo Include="bulkban.tests" />
+  </ItemGroup>
+
+</Project>

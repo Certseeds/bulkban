@@ -1,0 +1,40 @@
+:root { color-scheme: light dark; }
+body {
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 2rem 1.25rem;
+    line-height: 1.6;
+}
+h1 { font-size: 1.5rem; margin-bottom: .25rem; }
+.sub { color: #666; margin-top: 0; }
+#blazor-error-ui { display: none; }
+.drop {
+    border: 2px dashed #888;
+    border-radius: .75rem;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+.drop.hover { border-color: #2b7de9; background: rgba(43,125,233,.08); }
+.drop.busy { opacity: .6; pointer-events: none; }
+pre {
+    background: rgba(127,127,127,.12);
+    padding: .75rem;
+    border-radius: .5rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+.warn { color: #b45f06; }
+.err { color: #c0392b; }
+button {
+    font: inherit;
+    padding: .5rem 1rem;
+    border-radius: .5rem;
+    border: 1px solid #2b7de9;
+    background: #2b7de9;
+    color: #fff;
+    cursor: pointer;
+}

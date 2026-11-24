@@ -1,21 +1,36 @@
-using System.Text.Json;
-using bulkban.Certs;
+using System.Text;
+using bulkban.Core.Policies;
 using bulkban.Store;
 using bulkban.Wdac;
 
 namespace bulkban.Build;
 
+/// <summary>
+/// 把仓库/目录里的证书构造成 WDAC 产物。
+/// 分组、证书解析与 XML 生成都由 <see cref="PolicyPipeline"/> 完成(与浏览器共用),
+/// 这里只负责落盘、以及把 XML 转成 CIP 这一步(Windows 上仍交给 ConfigCI)。
+/// </summary>
 internal static class PolicyBuilder
 {
     internal static BuildResult Build(BuildOptions options, IPowerShellHost host)
     {
-        // 先完成所有读取/解析,任何失败都在写入前抛出,避免污染已有产物。
-        var groups = CertScanner.Scan(options.CertsDir);
-        var classified = groups.Select(CertClassifier.Classify).ToList();
-        var modeName = options.Mode.ToManifestValue();
-        var warnings = classified
-            .SelectMany(g => g.Unsupported.Select(u => $"[{g.Name}] 跳过 {u.FileName}:{u.UnsupportedReason}"))
+        var mode = options.Mode;
+        var certsDir = Path.GetFullPath(options.CertsDir);
+
+        var relativePaths = Directory.EnumerateFiles(certsDir, "*", SearchOption.AllDirectories)
+            .Where(p => p.EndsWith(".cer", StringComparison.OrdinalIgnoreCase))
+            .Select(p => Path.GetRelativePath(certsDir, p).Replace('\\', '/'))
             .ToList();
+
+        // 分组阶段就会抛「没有 .cer」「超过单组上限」等错误,必须在写入前完成。
+        var artifacts = PolicyPipeline.Build(
+            relativePaths,
+            relative => File.ReadAllBytes(Path.Combine(certsDir, relative.Replace('/', Path.DirectorySeparatorChar))),
+            xml => ConvertXmlToCip(xml, host),
+            mode,
+            out var warnings);
+
+        var warnList = warnings.ToList();
 
         Directory.CreateDirectory(options.OutputDir);
         var staging = Path.Combine(options.OutputDir, ".staging-" + Guid.NewGuid().ToString("N"));
@@ -24,40 +39,45 @@ internal static class PolicyBuilder
         try
         {
             var manifestGroups = new List<ManifestGroup>();
-            var skippedGroups = new List<string>();
-            var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var group in classified)
+            foreach (var artifact in artifacts)
             {
-                var entry = BuildGroup(group, staging, host, usedNames, options.Mode);
-                if (entry is null)
-                {
-                    skippedGroups.Add(group.Name);
-                    continue;
-                }
+                var xmlPath = Path.Combine(staging, mode.XmlDirectory(), artifact.FileStem + ".xml");
+                var cipPath = Path.Combine(staging, mode.CipDirectory(), artifact.FileStem + ".cip");
+                Directory.CreateDirectory(Path.GetDirectoryName(xmlPath)!);
+                Directory.CreateDirectory(Path.GetDirectoryName(cipPath)!);
 
-                manifestGroups.Add(entry);
+                File.WriteAllText(xmlPath, artifact.Xml, new UTF8Encoding(false));
+                File.WriteAllBytes(cipPath, artifact.Cip);
+                Hashing.WriteSidecar(xmlPath);
+                Hashing.WriteSidecar(cipPath);
+
+                manifestGroups.Add(new ManifestGroup(
+                    Name: artifact.GroupName,
+                    PolicyId: "{" + artifact.PolicyId.ToString().ToUpperInvariant() + "}",
+                    CertCount: artifact.CertCount,
+                    Unsupported: artifact.Unsupported
+                        .Select(u => new UnsupportedCert(u.FileName, u.Subject, u.UnsupportedReason ?? string.Empty))
+                        .ToList(),
+                    Xml: mode.XmlDirectory() + "/" + artifact.FileStem + ".xml",
+                    XmlSha256: Hashing.Sha256File(xmlPath),
+                    Cip: mode.CipDirectory() + "/" + artifact.FileStem + ".cip",
+                    CipSha256: Hashing.Sha256File(cipPath)));
             }
 
             var manifest = new Manifest(
                 SchemaVersion: 1,
                 ToolVersion: ToolVersion.Current,
                 GeneratedAt: DateTimeOffset.UtcNow.ToString("O"),
-                CertsDir: Path.GetFullPath(options.CertsDir),
-                Mode: modeName,
+                CertsDir: certsDir,
+                Mode: options.Mode.ToManifestValue(),
                 Groups: manifestGroups);
-
-            foreach (var skipped in skippedGroups)
-            {
-                warnings.Add($"[{skipped}] 该组没有受支持的证书,已跳过,不生成策略。");
-            }
 
             File.WriteAllText(
                 Path.Combine(staging, "manifest.json"),
-                JsonSerializer.Serialize(manifest, JsonContext.Default.Manifest));
+                System.Text.Json.JsonSerializer.Serialize(manifest, JsonContext.Default.Manifest));
 
             Commit(staging, options.OutputDir, options.Mode);
-            return new BuildResult(manifest, warnings);
+            return new BuildResult(manifest, warnList);
         }
         finally
         {
@@ -68,62 +88,31 @@ internal static class PolicyBuilder
         }
     }
 
-    private static ManifestGroup? BuildGroup(
-        ClassifiedGroup group,
-        string staging,
-        IPowerShellHost host,
-        HashSet<string> usedNames,
-        PolicyMode mode)
+    /// <summary>
+    /// ConfigCI 只接受文件路径,所以落一个临时文件再转换。
+    /// 临时文件放在系统临时目录,不污染输出目录。
+    /// </summary>
+    private static byte[] ConvertXmlToCip(string xml, IPowerShellHost host)
     {
-        // 组内没有任何可支持的证书时不生成策略:一个空的 AllowAll 策略会占用策略名额,
-        // 还会误导用户以为该组已被封禁。
-        if (group.Supported.Count == 0)
+        var tempDir = Path.Combine(Path.GetTempPath(), "bulkban-cip", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
         {
-            return null;
+            var xmlPath = Path.Combine(tempDir, "policy.xml");
+            var cipPath = Path.Combine(tempDir, "policy.cip");
+            File.WriteAllText(xmlPath, xml, new UTF8Encoding(false));
+            host.ConvertToCip(xmlPath, cipPath);
+            return File.ReadAllBytes(cipPath);
         }
-
-        var xmlDir = Path.Combine(staging, mode.XmlDirectory());
-        var cipDir = Path.Combine(staging, mode.CipDirectory());
-        Directory.CreateDirectory(xmlDir);
-        Directory.CreateDirectory(cipDir);
-
-        var fileStem = SafeFileName.Unique(group.Name, usedNames);
-        var xmlPath = Path.Combine(xmlDir, fileStem + ".xml");
-        var cipPath = Path.Combine(cipDir, fileStem + ".cip");
-
-        AllowAllTemplate.WriteTo(xmlPath);
-
-        foreach (var cert in group.Supported)
+        finally
         {
-            host.AddDenySigner(xmlPath, cert.FullPath);
+            Directory.Delete(tempDir, recursive: true);
         }
-
-        // Finalize 必须早于 ConvertToCip:PolicyID、规则选项和 ID 规范化都会写入 XML,
-        // 而 ConvertFrom-CIPolicy 会把当时的 XML 固化进 CIP。
-        var policyGuid = PolicyId.ForGroup(group.Name);
-        PolicyXml.Finalize(xmlPath, policyGuid, group.Name, mode);
-
-        host.ConvertToCip(xmlPath, cipPath);
-
-        Hashing.WriteSidecar(xmlPath);
-        Hashing.WriteSidecar(cipPath);
-
-        return new ManifestGroup(
-            Name: group.Name,
-            PolicyId: "{" + policyGuid.ToString().ToUpperInvariant() + "}",
-            CertCount: group.Supported.Count,
-            Unsupported: group.Unsupported
-                .Select(u => new UnsupportedCert(u.FileName, u.Subject, u.UnsupportedReason ?? string.Empty))
-                .ToList(),
-            Xml: mode.XmlDirectory() + "/" + fileStem + ".xml",
-            XmlSha256: Hashing.Sha256File(xmlPath),
-            Cip: mode.CipDirectory() + "/" + fileStem + ".cip",
-            CipSha256: Hashing.Sha256File(cipPath));
     }
 
     /// <summary>
-    /// 以“整体替换”的方式提交:只替换 xmls/、当前模式的 cips/&lt;mode&gt;/ 和 manifest.json;
-    /// 另一种模式的 CIP 目录保持不变。任何一步失败都回滚。
+    /// 以“整体替换”的方式提交:只替换当前模式的 xmls/cips 目录和 manifest.json;
+    /// 另一种模式的目录保持不变。任何一步失败都回滚。
     /// </summary>
     private static void Commit(string staging, string outputDir, PolicyMode mode)
     {
@@ -205,7 +194,6 @@ internal static class PolicyBuilder
         }
     }
 
-    /// <summary>备份目录里只有当前模式的 xmls/cips 目录和 manifest.json,按顶层路径恢复。</summary>
     private static void RestoreBackup(string backup, string outputDir)
     {
         Directory.CreateDirectory(outputDir);
