@@ -34,7 +34,8 @@ dotnet publish (Join-Path $projectDir 'bulkban.csproj') `
     -p:NativeDebugSymbols=false `
     -p:DebugType=None `
     -p:DebugSymbols=false `
-    -p:RestoreLockedMode=true
+    -p:RestoreLockedMode=true `
+    -p:AllowedReferenceRelatedFileExtensions=none
 
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE

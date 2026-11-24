@@ -5,6 +5,15 @@
     <AssemblyName>bulkban.core</AssemblyName>
     <RootNamespace>bulkban.Core</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>
+    <!--
+      这个项目没有任何 PackageReference(唯一的 ILLink.Tasks 由 IsAotCompatible 注入),
+      锁定文件对它没有意义。而 RestorePackagesWithLockFile 是全局开启的,
+      它的锁文件会因为「是否带 RID 还原」产生两种互相冲突的形态:
+        · 解决方案级 locked 模式还原不评估 RID,要求没有 win-x64 段
+        · exe 的 AOT 发布带 RID,要求有 win-x64 段
+      关掉这项后 core 不再生成锁文件,两种还原都能通过。
+    -->
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>
