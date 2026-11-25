@@ -470,13 +470,13 @@ internal static class Program
         return outcome.AllSucceeded ? ExitSuccess : ExitInstallFailed;
     }
 
-    private static Store.Manifest? ReadManifest(string path)
+    private static Manifest? ReadManifest(string path)
     {
         try
         {
             return System.Text.Json.JsonSerializer.Deserialize(
                 File.ReadAllText(path),
-                Store.JsonContext.Default.Manifest);
+                ManifestJsonContext.Default.Manifest);
         }
         catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException or UnauthorizedAccessException)
         {
@@ -484,7 +484,7 @@ internal static class Program
         }
     }
 
-    private static void PrintInstallPlan(Store.Manifest manifest, string backendName)
+    private static void PrintInstallPlan(Manifest manifest, string backendName)
     {
         var mode = string.Equals(manifest.Mode, "audit", StringComparison.OrdinalIgnoreCase)
             ? "audit(只记录,不阻止运行)"

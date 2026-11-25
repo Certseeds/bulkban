@@ -77,14 +77,14 @@ internal static class TempDir
     {
         File.WriteAllText(
             Path.Combine(root, "manifest.json"),
-            System.Text.Json.JsonSerializer.Serialize(manifest, JsonContext.Default.Manifest));
+            System.Text.Json.JsonSerializer.Serialize(manifest, ManifestJsonContext.Default.Manifest));
     }
 
     internal static Manifest LoadManifest(string outputDir)
     {
         return System.Text.Json.JsonSerializer.Deserialize(
             File.ReadAllText(Path.Combine(outputDir, "manifest.json")),
-            JsonContext.Default.Manifest)!;
+            ManifestJsonContext.Default.Manifest)!;
     }
 
     internal static Manifest ManifestWithTwoGroups()

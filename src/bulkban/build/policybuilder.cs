@@ -74,7 +74,7 @@ internal static class PolicyBuilder
 
             File.WriteAllText(
                 Path.Combine(staging, "manifest.json"),
-                System.Text.Json.JsonSerializer.Serialize(manifest, JsonContext.Default.Manifest));
+                System.Text.Json.JsonSerializer.Serialize(manifest, ManifestJsonContext.Default.Manifest));
 
             Commit(staging, options.OutputDir, options.Mode);
             return new BuildResult(manifest, warnList);

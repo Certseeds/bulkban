@@ -33,6 +33,14 @@
     <h2>结果</h2>
     <pre>@string.Join("\n", _lines)</pre>
     <button @onclick="Download">下载 @_downloadName</button>
+
+    <h2>产物说明</h2>
+    <ul>
+        <li><code>audit-manifest.json</code> / <code>enforce-manifest.json</code>:两种模式各一份清单,记录每个 policy 的 PolicyID、产物路径与 SHA-256。</li>
+        <li><code>manifest.json</code>:占位文件,只列出上面两份清单的名字。一个包里同时有两套策略,没法用单个清单表达。</li>
+        <li>每个 <code>.xml</code> / <code>.cip</code> 旁边有对应的 <code>.sha256</code>。</li>
+    </ul>
+    <p class="sub">要用 <code>bulkban install</code> 安装:解压后把所需模式的清单改名为 <code>manifest.json</code>,再以该目录作为 <code>--output-dir</code>。</p>
 }
 
 @if (_warnings.Count > 0)

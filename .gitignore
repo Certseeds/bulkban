@@ -656,6 +656,7 @@ $RECYCLE.BIN/
 /bin/
 /dist/
 /certs/
+/certs.zip
 /audit-xmls/
 /audit-cips/
 /enforce-xmls/

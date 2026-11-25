@@ -103,7 +103,7 @@ internal static class Verifier
         {
             var manifest = JsonSerializer.Deserialize(
                 File.ReadAllText(manifestPath),
-                JsonContext.Default.Manifest);
+                ManifestJsonContext.Default.Manifest);
             return manifest is null
                 ? (null, "manifest.json 无法解析")
                 : (manifest, null);

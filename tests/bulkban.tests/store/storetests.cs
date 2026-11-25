@@ -21,10 +21,10 @@ public class StoreTests
                 "bb"),
         });
 
-        var json = JsonSerializer.Serialize(manifest, JsonContext.Default.Manifest);
-        var back = JsonSerializer.Deserialize(json, JsonContext.Default.Manifest)!;
+        var json = JsonSerializer.Serialize(manifest, ManifestJsonContext.Default.Manifest);
+        var back = JsonSerializer.Deserialize(json, ManifestJsonContext.Default.Manifest)!;
 
-        Assert.Equal(json, JsonSerializer.Serialize(back, JsonContext.Default.Manifest));
+        Assert.Equal(json, JsonSerializer.Serialize(back, ManifestJsonContext.Default.Manifest));
         Assert.Equal(manifest.Groups[0].PolicyId, back.Groups[0].PolicyId);
         Assert.Equal(manifest.Groups[0].Unsupported[0], back.Groups[0].Unsupported[0]);
         Assert.Contains("\"policyId\"", json);

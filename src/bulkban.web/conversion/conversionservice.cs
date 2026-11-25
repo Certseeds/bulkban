@@ -16,6 +16,12 @@ internal sealed record ConversionResult(
 /// </summary>
 internal static class ConversionService
 {
+    /// <summary>写进 manifest 的 certsDir:数据来自上传的 zip,没有真实路径。</summary>
+    private const string CertsRootInZip = "certs";
+
+    private static string ToolVersion =>
+        typeof(ConversionService).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+
     internal static ConversionResult Convert(Stream certZip)
     {
         var entries = CertZipReader.Read(certZip);
@@ -36,8 +42,10 @@ internal static class ConversionService
         var warnings = new List<string>();
         var lines = new List<string>();
         var files = new List<OutputFile>();
+        var modes = new[] { PolicyMode.Audit, PolicyMode.Enforce };
+        var generatedAt = DateTimeOffset.UtcNow;
 
-        foreach (var mode in new[] { PolicyMode.Audit, PolicyMode.Enforce })
+        foreach (var mode in modes)
         {
             var artifacts = PolicyPipeline.Build(
                 byPath.Keys,
@@ -48,14 +56,20 @@ internal static class ConversionService
 
             warnings.AddRange(modeWarnings);
             files.AddRange(OutputLayout.Arrange(artifacts, mode));
+            files.Add(OutputLayout.ManifestFile(
+                artifacts, mode, CertsRootInZip, ToolVersion, generatedAt));
 
             lines.Add($"[{mode.ToManifestValue()}] {artifacts.Count} 个 policy,"
                       + $"{artifacts.Sum(a => a.CertCount)} 张证书");
         }
 
+        // 根目录的 manifest.json 是占位:exe 的 install 只认这个名字,
+        // 但一个包里同时有 audit 与 enforce,所以用两份带前缀的 manifest 表达。
+        files.Add(OutputLayout.PlaceholderManifest(modes));
+
         var zip = ResultZipWriter.Write(
             files.OrderBy(f => f.Path, StringComparer.Ordinal).ToList(),
-            DateTimeOffset.UtcNow);
+            generatedAt);
 
         return new ConversionResult(zip, lines, warnings);
     }
